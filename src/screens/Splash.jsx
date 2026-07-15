@@ -18,7 +18,7 @@ export default function Splash({ onNext }) {
           <p style={{ marginTop: 6 }}>Поиск компании для любых твоих планов и интересов</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, justifyContent: 'center' }}>
           {BENEFITS.map((b) => (
             <div key={b.title} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div style={{ fontSize: 24, lineHeight: 1 }}>{b.ic}</div>
