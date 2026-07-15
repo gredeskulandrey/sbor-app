@@ -1,0 +1,15 @@
+export const TOPICS = [
+  { id: 'bars', label: 'Бары', ic: '🍸' },
+  { id: 'rest', label: 'Рестораны', ic: '🍽️' },
+  { id: 'concerts', label: 'Концерты', ic: '🎤' },
+  { id: 'movies', label: 'Кино', ic: '🎬' },
+  { id: 'museums', label: 'Музеи и выставки', ic: '🎭' },
+  { id: 'sport', label: 'Спорт', ic: '⚽' },
+  { id: 'yoga', label: 'Йога', ic: '🧘' },
+  { id: 'boardgames', label: 'Настолки', ic: '🎲' },
+  { id: 'travel', label: 'Путешествия', ic: '🧭' },
+  { id: 'pcgames', label: 'Компьютерные игры', ic: '🎮' },
+  { id: 'workshops', label: 'Мастер-классы', ic: '🛠️' },
+  { id: 'picnics', label: 'Пикники', ic: '🧺' },
+  { id: 'other', label: 'Другое', ic: '✨' },
+];
