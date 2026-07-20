@@ -4,10 +4,29 @@
   --text:#f2efea; --text-dim:#9096ac; --text-faint:#5c6280;
 }
 *{box-sizing:border-box; margin:0; padding:0;}
-body{background:#05060a; font-family:'Inter',sans-serif; color:var(--text); display:flex; justify-content:center; padding:32px 12px; min-height:100vh;}
+html, body{height:100%;}
+body{background:#05060a; font-family:'Inter',sans-serif; color:var(--text); display:flex; justify-content:center; padding:32px 12px; min-height:100vh; min-height:100dvh;}
 #root{width:400px; max-width:100%;}
 .phone{width:400px; max-width:100%; min-height:844px; background:var(--ink); border-radius:36px; border:8px solid #000;
   box-shadow:0 40px 80px -20px rgba(0,0,0,.7); overflow:hidden; position:relative; display:flex; flex-direction:column;}
+
+/* На настоящем телефоне (а не как макет-превью на компьютере) — без рамки, во весь экран,
+   без плавающих отступов, чтобы это по-настоящему выглядело как мобильное приложение */
+@media (max-width: 480px){
+  body{padding:0; display:block;}
+  #root{width:100%;}
+  .phone{
+    width:100%;
+    min-height:100vh;
+    min-height:100dvh;
+    height:100vh;
+    height:100dvh;
+    border-radius:0;
+    border:none;
+    box-shadow:none;
+  }
+}
+
 .screen{flex:1; display:flex; flex-direction:column;}
 h1,h2,h3{font-family:'Unbounded',sans-serif; letter-spacing:-0.02em;}
 .auth-wrap{padding:36px 26px; flex:1; display:flex; flex-direction:column;}
@@ -47,7 +66,7 @@ textarea{resize:none; min-height:80px;}
 .center-msg{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px;}
 
 /* ---- Каркас приложения (таббар) ---- */
-.app-shell{display:flex; flex-direction:column; height:844px;}
+.app-shell{display:flex; flex-direction:column; height:100%; flex:1;}
 .tab-content{flex:1; overflow-y:auto; display:flex; flex-direction:column;}
 .tabbar{display:flex; border-top:1px solid var(--stroke); background:var(--ink-2); flex-shrink:0; padding:10px 8px;}
 .tabbtn{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none;
