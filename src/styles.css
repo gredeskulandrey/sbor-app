@@ -99,4 +99,11 @@ textarea{resize:none; min-height:80px;}
 .toggle2 button.active{background:var(--coral); color:#1a0d09;}
 .profile-hero{padding:24px 20px 10px; display:flex; align-items:center; gap:14px;}
 .avatar{width:64px; height:64px; border-radius:18px; font-size:26px; background:var(--card-2); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.stat-box{flex:1; background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:12px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;}
+.stat-box .n{font-family:'Unbounded'; font-size:18px; color:var(--coral); line-height:1.2;}
+.stat-box .l{font-size:9.5px; color:var(--text-dim); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;}
+.switch{width:44px; height:26px; border-radius:100px; background:var(--card-2); border:1px solid var(--stroke); position:relative; cursor:pointer; flex-shrink:0;}
+.switch .dot{width:20px; height:20px; border-radius:50%; background:var(--text-faint); position:absolute; top:2px; left:2px; transition:all .2s;}
+.switch.on{background:var(--coral); border-color:var(--coral);}
+.switch.on .dot{background:#1a0d09; left:21px;}
 .settings-row{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #22263a; cursor:pointer;}
