@@ -24,6 +24,12 @@ body{background:#05060a; font-family:'Inter',sans-serif; color:var(--text); disp
     border-radius:0;
     border:none;
     box-shadow:none;
+    /* Отступы под "чёлку"/статус-бар и нижнюю полосу свайпа на iPhone —
+       без них верхние кнопки (назад, город и т.п.) оказываются под системной областью и не нажимаются */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
 
