@@ -22,7 +22,15 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
   if (view === 'support') return <SupportView onBack={() => setView('main')} />;
   if (view === 'legal') return <LegalView onBack={() => setView('main')} />;
   if (view === 'deleteReasons') return <DeleteReasonsView onBack={() => setView('main')} onConfirmed={() => setView('deleteProcessing')} />;
-  if (view === 'deleteProcessing') return <DeleteProcessingView onDone={() => setView('deleteFarewell')} />;
+  if (view === 'deleteProcessing') return (
+    <DeleteProcessingView
+      onDone={() => setView('deleteFarewell')}
+      onFailed={(msg) => setView({ name: 'deleteFailed', msg })}
+    />
+  );
+  if (typeof view === 'object' && view?.name === 'deleteFailed') {
+    return <DeleteFailedView message={view.msg} onBack={() => setView('main')} onRetry={() => setView('deleteProcessing')} />;
+  }
   if (view === 'deleteFarewell') return <DeleteFarewellView onFinish={onAccountDeleted} />;
 
   return (
@@ -308,14 +316,20 @@ function DeleteReasonsView({ onBack, onConfirmed }) {
   );
 }
 
-function DeleteProcessingView({ onDone }) {
+function DeleteProcessingView({ onDone, onFailed }) {
   React.useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      await supabase.functions.invoke('delete-account', {
+      const { data, error } = await supabase.functions.invoke('delete-account', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      setTimeout(onDone, 2000);
+      // Раньше здесь ничего не проверялось — экран "готово" показывался, даже если
+      // удаление на сервере не сработало, и аккаунт на самом деле оставался целым.
+      if (error || data?.error || !data?.success) {
+        onFailed(data?.error || error?.message || 'Не получилось удалить аккаунт');
+        return;
+      }
+      setTimeout(onDone, 1500);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -324,6 +338,18 @@ function DeleteProcessingView({ onDone }) {
     <div className="center-msg">
       <div style={{ fontSize: 30, marginBottom: 14 }}>⚙️</div>
       <p>Удаляю твои данные...</p>
+    </div>
+  );
+}
+
+function DeleteFailedView({ message, onBack, onRetry }) {
+  return (
+    <div className="center-msg">
+      <div style={{ fontSize: 34, marginBottom: 14 }}>⚠️</div>
+      <h2 style={{ fontSize: 17, marginBottom: 10 }}>Не получилось удалить аккаунт</h2>
+      <p style={{ color: 'var(--text-dim)', fontSize: 12.5, marginBottom: 20 }}>{String(message)}</p>
+      <button className="btn btn-primary" style={{ marginBottom: 10 }} onClick={onRetry}>Попробовать ещё раз</button>
+      <button className="btn btn-ghost" onClick={onBack}>Назад в настройки</button>
     </div>
   );
 }
