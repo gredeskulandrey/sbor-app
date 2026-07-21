@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { TOPICS } from '../constants.js';
+import PhotoManager from '../PhotoManager.jsx';
 
 const currentMaxDobYear = () => new Date().getFullYear() - 18;
 
 export default function ProfileForm({ onSaved }) {
+  const [userId, setUserId] = useState(null);
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
   const [gender, setGender] = useState('');
@@ -12,11 +14,17 @@ export default function ProfileForm({ onSaved }) {
   const [dobMonth, setDobMonth] = useState('');
   const [dobYear, setDobYear] = useState('');
   const [about, setAbout] = useState('');
-  const [photos, setPhotos] = useState(0); // количество "загруженных" фото (0-5) — реальная загрузка файлов будет в следующем куске
+  const [photos, setPhotos] = useState([]); // реальные загруженные фото: [{photo_url, storage_path, sort_order}]
   const [topics, setTopics] = useState([]);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserId(session.user.id);
+    });
+  }, []);
 
   function toggleTopic(id) {
     setTopics((prev) => {
@@ -36,14 +44,14 @@ export default function ProfileForm({ onSaved }) {
   const genderInvalid = submitted && !gender;
   const dobInvalid = submitted && !(dobDay && dobMonth && dobYear);
   const aboutInvalid = submitted && !about.trim();
-  const photosInvalid = submitted && photos < 1;
+  const photosInvalid = submitted && photos.length < 1;
   const topicsInvalid = submitted && (topics.length < 1 || topics.length > 5);
 
   async function handleSubmit() {
     setSubmitted(true);
     const valid =
       first.trim().length >= 2 && gender && dobDay && dobMonth && dobYear &&
-      about.trim() && photos >= 1 && topics.length >= 1 && topics.length <= 5;
+      about.trim() && photos.length >= 1 && topics.length >= 1 && topics.length <= 5;
     if (!valid) return;
 
     setSaving(true);
@@ -68,9 +76,24 @@ export default function ProfileForm({ onSaved }) {
       topics,
     });
 
-    setSaving(false);
     if (insertError) {
+      setSaving(false);
       setError('Не получилось сохранить анкету: ' + insertError.message);
+      return;
+    }
+
+    // Фото уже загружены в хранилище на предыдущем шаге — теперь просто привязываем их к профилю
+    const { error: photosError } = await supabase.from('profile_photos').insert(
+      photos.map((p) => ({
+        profile_id: session.user.id,
+        photo_url: p.photo_url,
+        sort_order: p.sort_order,
+      }))
+    );
+
+    setSaving(false);
+    if (photosError) {
+      setError('Анкета сохранена, но не получилось сохранить фото: ' + photosError.message);
       return;
     }
     onSaved();
@@ -135,20 +158,7 @@ export default function ProfileForm({ onSaved }) {
 
         <div className={'field' + (photosInvalid ? ' invalid' : '')}>
           <label>Фото профиля — минимум 1, максимум 5</label>
-          <div className="photo-grid">
-            {[0, 1, 2, 3, 4].map((i) => {
-              const filled = i < photos;
-              return (
-                <div
-                  key={i}
-                  className={'photo-slot' + (filled ? ' filled' : '')}
-                  onClick={() => setPhotos(filled ? photos - 1 : Math.min(5, photos + 1))}
-                >
-                  {filled ? '✓' : '+'}
-                </div>
-              );
-            })}
-          </div>
+          {userId && <PhotoManager userId={userId} photos={photos} onChange={setPhotos} />}
           {photosInvalid && <div className="field-error">Загрузи хотя бы одно фото</div>}
         </div>
 
