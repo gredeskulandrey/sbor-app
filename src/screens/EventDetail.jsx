@@ -54,6 +54,16 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
     setBusy(false);
   }
 
+  async function handleRejectGuest(guest) {
+    const name = `${guest.profiles?.first_name || ''} ${guest.profiles?.last_name || ''}`.trim() || 'этого гостя';
+    const sure = window.confirm(`Убрать ${name} со встречи? Встреча пропадёт из его(её) списка.`);
+    if (!sure) return;
+    setBusy(true);
+    await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', guest.user_id);
+    await load();
+    setBusy(false);
+  }
+
   async function handleCancelMeeting() {
     if (attendees.length > 0) {
       const sure = window.confirm(
@@ -148,6 +158,15 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
                   <span style={{ fontSize: 11, marginLeft: 'auto', color: a.attended ? 'var(--mint)' : 'var(--text-faint)' }}>
                     {a.attended ? '✓ был(а)' : 'не пришёл(-ла)'}
                   </span>
+                )}
+                {!isEventPast(event) && (
+                  <button
+                    onClick={() => handleRejectGuest(a)}
+                    disabled={busy}
+                    style={{ marginLeft: 'auto', background: 'none', border: '1px solid #5a2b28', color: '#ff8b7d', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
+                  >
+                    Отклонить
+                  </button>
                 )}
               </div>
             ))}
