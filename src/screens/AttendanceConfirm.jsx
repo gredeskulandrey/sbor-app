@@ -111,7 +111,7 @@ export default function AttendanceConfirm({ eventId, onDone }) {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 12, marginBottom: 8 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Avatar photoUrl={photoMap[a.user_id]} size={32} />
+              <Avatar photoUrl={photoMap[a.user_id]} profileId={a.user_id} size={32} />
               <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
