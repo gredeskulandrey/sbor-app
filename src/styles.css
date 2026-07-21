@@ -47,6 +47,7 @@ h1,h2,h3{font-family:'Unbounded',sans-serif; letter-spacing:-0.02em;}
 .field{margin-bottom:14px;}
 .field.invalid input{border-color:#ff8b7d;}
 .field-error{color:#ff8b7d; font-size:11px; margin-top:5px;}
+.field-note{color:#ff8b7d; font-size:11px; line-height:1.5; opacity:.85;}
 label{font-size:12px; color:var(--text-dim); margin-bottom:6px; display:block; font-weight:500;}
 input,textarea,select{width:100%; background:var(--card); border:1px solid var(--stroke); color:var(--text);
   padding:13px 14px; border-radius:12px; font-family:'Inter',sans-serif; font-size:14px; outline:none;}
