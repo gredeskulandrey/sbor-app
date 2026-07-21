@@ -106,7 +106,7 @@ export default function ProfileTab({ onSignOut }) {
   return (
     <div>
       <div className="profile-hero">
-        <Avatar photoUrl={photoUrl} size={64} />
+        <Avatar photoUrl={photoUrl} profileId={profile.id} size={64} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 19 }}>{profile.first_name} {profile.last_name || ''}</h2>
