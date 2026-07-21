@@ -117,7 +117,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
 
         {organizer && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 16, marginBottom: 16 }}>
-            <Avatar photoUrl={photoMap[event.organizer_id]} size={44} />
+            <Avatar photoUrl={photoMap[event.organizer_id]} profileId={event.organizer_id} size={44} />
             <div>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{organizer.first_name} {organizer.last_name || ''}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Организатор встречи</div>
@@ -168,7 +168,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
             {attendees.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>Пока никто не присоединился</div>}
             {attendees.map((a) => (
               <div key={a.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #22263a' }}>
-                <Avatar photoUrl={photoMap[a.user_id]} size={32} />
+                <Avatar photoUrl={photoMap[a.user_id]} profileId={a.user_id} size={32} />
                 <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
                 {event.attendance_confirmed && (
                   <span style={{ fontSize: 11, marginLeft: 'auto', color: a.attended ? 'var(--mint)' : 'var(--text-faint)' }}>
