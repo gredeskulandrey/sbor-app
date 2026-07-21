@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { TOPICS } from '../constants.js';
+import PhotoManager from '../PhotoManager.jsx';
 
 const FAQ = [
   { q: 'Как проходит проверка личности?', a: 'При регистрации нужно сделать два селфи с определённым жестом — так мы убеждаемся, что за анкетой стоит реальный человек, а не бот или фейковый профиль.' },
@@ -67,9 +68,23 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
 function EditProfileView({ profile, onBack, onSaved }) {
   const [about, setAbout] = useState(profile.about || '');
   const [topics, setTopics] = useState(profile.topics || []);
-  const [photos, setPhotos] = useState(profile.photoCount || 0);
+  const [photos, setPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('profile_photos')
+        .select('id, photo_url, sort_order')
+        .eq('profile_id', profile.id)
+        .order('sort_order', { ascending: true });
+      setPhotos(data || []);
+      setLoadingPhotos(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggleTopic(id) {
     setTopics((prev) => {
@@ -80,7 +95,7 @@ function EditProfileView({ profile, onBack, onSaved }) {
   }
 
   async function handleSave() {
-    if (!about.trim() || topics.length < 1 || photos < 1) {
+    if (!about.trim() || topics.length < 1 || photos.length < 1) {
       setError('Заполни «о себе», оставь хотя бы 1 фото и минимум 1 тему');
       return;
     }
@@ -89,8 +104,15 @@ function EditProfileView({ profile, onBack, onSaved }) {
       .from('profiles')
       .update({ about: about.trim(), topics })
       .eq('id', profile.id);
+
+    // Проще и надёжнее всего пересохранить список фото целиком, а не высчитывать разницу
+    await supabase.from('profile_photos').delete().eq('profile_id', profile.id);
+    const { error: photosErr } = await supabase.from('profile_photos').insert(
+      photos.map((p, i) => ({ profile_id: profile.id, photo_url: p.photo_url, sort_order: i }))
+    );
+
     setSaving(false);
-    if (updErr) { setError('Не получилось сохранить: ' + updErr.message); return; }
+    if (updErr || photosErr) { setError('Не получилось сохранить: ' + (updErr?.message || photosErr?.message)); return; }
     onSaved({ ...profile, about: about.trim(), topics });
     onBack();
   }
@@ -106,20 +128,7 @@ function EditProfileView({ profile, onBack, onSaved }) {
 
         <div className="field">
           <label>Фото профиля — минимум 1, максимум 5</label>
-          <div className="photo-grid">
-            {[0, 1, 2, 3, 4].map((i) => {
-              const filled = i < photos;
-              return (
-                <div
-                  key={i}
-                  className={'photo-slot' + (filled ? ' filled' : '')}
-                  onClick={() => setPhotos(filled ? photos - 1 : Math.min(5, photos + 1))}
-                >
-                  {filled ? '✓' : '+'}
-                </div>
-              );
-            })}
-          </div>
+          {!loadingPhotos && <PhotoManager userId={profile.id} photos={photos} onChange={setPhotos} />}
         </div>
 
         <div className="field">
