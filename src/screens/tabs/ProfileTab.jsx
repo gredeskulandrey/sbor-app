@@ -149,7 +149,10 @@ export default function ProfileTab({ onSignOut }) {
                 opacity: unlocked ? 1 : 0.45,
               }}>
                 <div style={{ fontSize: 20 }}>{a.ic}</div>
-                <div style={{ fontSize: 13 }}>{a.title}</div>
+                <div>
+                  <div style={{ fontSize: 13 }}>{a.title}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-dim)', marginTop: 2 }}>{a.desc}</div>
+                </div>
               </div>
             );
           })}
