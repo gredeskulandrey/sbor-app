@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
+import Avatar from '../Avatar.jsx';
 
 export default function AttendanceConfirm({ eventId, onDone }) {
   const [event, setEvent] = useState(null);
@@ -7,6 +8,7 @@ export default function AttendanceConfirm({ eventId, onDone }) {
   const [checks, setChecks] = useState({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [photoMap, setPhotoMap] = useState({});
 
   useEffect(() => {
     load();
@@ -26,6 +28,17 @@ export default function AttendanceConfirm({ eventId, onDone }) {
     const initial = {};
     list.forEach((a) => { initial[a.user_id] = false; });
     setChecks(initial);
+
+    if (list.length > 0) {
+      const { data: photoRows } = await supabase
+        .from('profile_photos')
+        .select('profile_id, photo_url, sort_order')
+        .in('profile_id', list.map((a) => a.user_id))
+        .order('sort_order', { ascending: true });
+      const map = {};
+      (photoRows || []).forEach((p) => { if (!map[p.profile_id]) map[p.profile_id] = p.photo_url; });
+      setPhotoMap(map);
+    }
     setLoading(false);
   }
 
@@ -98,7 +111,7 @@ export default function AttendanceConfirm({ eventId, onDone }) {
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 12, marginBottom: 8 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="avatar" style={{ width: 32, height: 32 }}>🙂</div>
+              <Avatar photoUrl={photoMap[a.user_id]} size={32} />
               <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
