@@ -320,6 +320,10 @@ function DeleteProcessingView({ onDone, onFailed }) {
   React.useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        onFailed('Сессия потерялась — попробуй выйти и войти заново, потом повтори удаление');
+        return;
+      }
       const { data, error } = await supabase.functions.invoke('delete-account', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
