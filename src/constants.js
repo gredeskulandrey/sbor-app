@@ -44,21 +44,21 @@ export const CITY_COORDS = {
 export const CITIES = Object.keys(CITY_COORDS);
 
 export const ACHIEVEMENTS = [
-  { id: 'movies', ic: '🎬', title: 'Киношник' },
-  { id: 'bars', ic: '🍸', title: 'Завсегдатай баров' },
-  { id: 'boardgames', ic: '🎲', title: 'Король настолок' },
-  { id: 'museums', ic: '🎭', title: 'Ценитель искусства' },
-  { id: 'cities3', ic: '🧭', title: 'Легко на подъём' },
-  { id: 'reliable', ic: '🛡️', title: 'Надёжный гость' },
-  { id: 'guest10', ic: '🎉', title: 'Душа компании' },
-  { id: 'organizer5', ic: '👑', title: 'Организатор года' },
-  { id: 'total20', ic: '🌟', title: 'Старожил' },
-  { id: 'days30', ic: '⏱️', title: 'Уже как дома' },
-  { id: 'rest', ic: '🍽️', title: 'Гурман' },
-  { id: 'sport', ic: '🏋️', title: 'Спортивный дух' },
-  { id: 'concerts', ic: '🎤', title: 'Меломан' },
-  { id: 'workshops', ic: '🛠️', title: 'Мастер на все руки' },
-  { id: 'late5', ic: '🌙', title: 'Полуночник' },
+  { id: 'movies', ic: '🎬', title: 'Киношник', desc: '5+ встреч по теме «Кино»' },
+  { id: 'bars', ic: '🍸', title: 'Завсегдатай баров', desc: '5+ встреч по теме «Бары»' },
+  { id: 'boardgames', ic: '🎲', title: 'Король настолок', desc: '5+ встреч по теме «Настолки»' },
+  { id: 'museums', ic: '🎭', title: 'Ценитель искусства', desc: '5+ встреч по теме «Музеи и выставки»' },
+  { id: 'cities3', ic: '🧭', title: 'Легко на подъём', desc: 'Встречи в 3+ разных городах' },
+  { id: 'reliable', ic: '🛡️', title: 'Надёжный гость', desc: 'Явка выше 95% на 5+ встречах' },
+  { id: 'guest10', ic: '🎉', title: 'Душа компании', desc: '10+ встреч как гость' },
+  { id: 'organizer5', ic: '👑', title: 'Организатор года', desc: '5+ встреч как организатор' },
+  { id: 'total20', ic: '🌟', title: 'Старожил', desc: '20+ встреч суммарно' },
+  { id: 'days30', ic: '⏱️', title: 'Уже как дома', desc: 'В приложении больше 30 дней' },
+  { id: 'rest', ic: '🍽️', title: 'Гурман', desc: '5+ встреч по теме «Рестораны»' },
+  { id: 'sport', ic: '🏋️', title: 'Спортивный дух', desc: '5+ встреч по теме «Спорт»' },
+  { id: 'concerts', ic: '🎤', title: 'Меломан', desc: '5+ встреч по теме «Концерты»' },
+  { id: 'workshops', ic: '🛠️', title: 'Мастер на все руки', desc: '5+ мастер-классов' },
+  { id: 'late5', ic: '🌙', title: 'Полуночник', desc: '5+ встреч, начинавшихся после 21:00' },
 ];
 
 // Города в предложном падеже ("в Москве", "в Казани" и т.д.) — для заголовков
