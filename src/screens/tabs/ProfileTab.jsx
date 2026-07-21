@@ -4,6 +4,8 @@ import { catInfo, ACHIEVEMENTS } from '../../constants.js';
 import { formatPhoneDisplay } from '../../formatPhoneDisplay.js';
 import { computeAchievements } from '../../computeAchievements.js';
 import SettingsScreen from '../SettingsScreen.jsx';
+import Avatar from '../../Avatar.jsx';
+import { getPrimaryPhoto } from '../../getPrimaryPhoto.js';
 
 function calcAge(birthDateStr) {
   if (!birthDateStr) return null;
@@ -26,6 +28,7 @@ export default function ProfileTab({ onSignOut }) {
   const [organizerCount, setOrganizerCount] = useState(0);
   const [attendanceRate, setAttendanceRate] = useState(100);
   const [unlockedIds, setUnlockedIds] = useState(new Set());
+  const [photoUrl, setPhotoUrl] = useState(null);
 
   useEffect(() => {
     loadEverything();
@@ -41,6 +44,7 @@ export default function ProfileTab({ onSignOut }) {
 
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
     setProfile(prof);
+    setPhotoUrl(await getPrimaryPhoto(user.id));
 
     // Постоянный журнал встреч — источник правды для статистики и ачивок
     const { data: meetings } = await supabase.from('completed_meetings').select('*').eq('user_id', user.id);
@@ -78,7 +82,7 @@ export default function ProfileTab({ onSignOut }) {
     return (
       <SettingsScreen
         profile={profile}
-        onBack={() => setShowSettings(false)}
+        onBack={() => { setShowSettings(false); loadEverything(); }}
         onProfileUpdated={handleProfileUpdated}
         onAccountDeleted={handleSignOut}
       />
@@ -102,7 +106,7 @@ export default function ProfileTab({ onSignOut }) {
   return (
     <div>
       <div className="profile-hero">
-        <div className="avatar">🙂</div>
+        <Avatar photoUrl={photoUrl} size={64} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 19 }}>{profile.first_name} {profile.last_name || ''}</h2>
