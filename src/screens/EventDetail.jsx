@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import { catInfo } from '../constants.js';
 import { isEventPast } from '../isEventPast.js';
+import { formatEventDate, formatEventTime } from '../formatDateTime.js';
 import Avatar from '../Avatar.jsx';
+import Loading from '../Loading.jsx';
+import PublicProfile from './PublicProfile.jsx';
 
 export default function EventDetail({ eventId, onBack, onOpenChat }) {
   const [event, setEvent] = useState(null);
@@ -12,6 +15,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [photoMap, setPhotoMap] = useState({});
+  const [viewingProfileId, setViewingProfileId] = useState(null);
 
   useEffect(() => {
     load();
@@ -37,7 +41,6 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
       const attendeesList = att || [];
       setAttendees(attendeesList);
 
-      // Одним запросом получаем главные фото сразу и организатора, и всех гостей
       const allIds = [ev.organizer_id, ...attendeesList.map((a) => a.user_id)];
       const { data: photoRows } = await supabase
         .from('profile_photos')
@@ -96,13 +99,17 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
     onBack();
   }
 
-  if (loading) return <div className="center-msg">Загрузка...</div>;
+  if (viewingProfileId) {
+    return <PublicProfile profileId={viewingProfileId} onBack={() => setViewingProfileId(null)} />;
+  }
+
+  if (loading) return <Loading />;
   if (!event) return <div className="center-msg">Встреча не найдена</div>;
 
   const cat = catInfo(event.category);
 
   return (
-    <div className="screen" style={{ overflowY: 'auto' }}>
+    <div className="screen">
       <div style={{ padding: '16px 20px' }}>
         <div className="backbtn" onClick={onBack}>←</div>
 
@@ -111,13 +118,18 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
         <div style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
           <div>{cat.ic} {cat.label}</div>
           <div>📍 {event.is_online ? event.online_link : `${event.venue_name}, ${event.address}`}</div>
-          <div>🕐 {event.event_date} {event.event_time}</div>
+          {!event.is_online && event.venue_link && <div>🔗 {event.venue_link}</div>}
+          <div>🕐 {formatEventDate(event.event_date)}, {formatEventTime(event.event_time)}</div>
+          {event.rules && <div>📋 Правила: {event.rules}</div>}
           {event.age_restriction && <div>🔞 {event.age_restriction}</div>}
         </div>
 
         {organizer && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 16, marginBottom: 16 }}>
-            <Avatar photoUrl={photoMap[event.organizer_id]} profileId={event.organizer_id} size={44} />
+          <div
+            onClick={() => setViewingProfileId(event.organizer_id)}
+            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 16, marginBottom: 16, cursor: 'pointer' }}
+          >
+            <Avatar photoUrl={photoMap[event.organizer_id]} size={44} />
             <div>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{organizer.first_name} {organizer.last_name || ''}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Организатор встречи</div>
@@ -168,10 +180,15 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
             {attendees.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>Пока никто не присоединился</div>}
             {attendees.map((a) => (
               <div key={a.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #22263a' }}>
-                <Avatar photoUrl={photoMap[a.user_id]} profileId={a.user_id} size={32} />
-                <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
+                <div
+                  onClick={() => setViewingProfileId(a.user_id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1 }}
+                >
+                  <Avatar photoUrl={photoMap[a.user_id]} size={32} />
+                  <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
+                </div>
                 {event.attendance_confirmed && (
-                  <span style={{ fontSize: 11, marginLeft: 'auto', color: a.attended ? 'var(--mint)' : 'var(--text-faint)' }}>
+                  <span style={{ fontSize: 11, marginLeft: 8, color: a.attended ? 'var(--mint)' : 'var(--text-faint)' }}>
                     {a.attended ? '✓ был(а)' : 'не пришёл(-ла)'}
                   </span>
                 )}
@@ -179,7 +196,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
                   <button
                     onClick={() => handleRejectGuest(a)}
                     disabled={busy}
-                    style={{ marginLeft: 'auto', background: 'none', border: '1px solid #5a2b28', color: '#ff8b7d', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
+                    style={{ marginLeft: 8, background: 'none', border: '1px solid #5a2b28', color: '#ff8b7d', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
                   >
                     Отклонить
                   </button>
