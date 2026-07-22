@@ -14,6 +14,7 @@ const FAQ = [
 
 export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAccountDeleted }) {
   const [view, setView] = useState('main');
+  const [deleteFeedback, setDeleteFeedback] = useState(null);
 
   if (view === 'editProfile') return <EditProfileView profile={profile} onBack={() => setView('main')} onSaved={onProfileUpdated} />;
   if (view === 'notifications') return <NotificationsView profile={profile} onBack={() => setView('main')} onProfileUpdated={onProfileUpdated} />;
@@ -21,9 +22,15 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
   if (view === 'faq') return <FaqView onBack={() => setView('main')} />;
   if (view === 'support') return <SupportView onBack={() => setView('main')} />;
   if (view === 'legal') return <LegalView onBack={() => setView('main')} />;
-  if (view === 'deleteReasons') return <DeleteReasonsView onBack={() => setView('main')} onConfirmed={() => setView('deleteProcessing')} />;
+  if (view === 'deleteReasons') return (
+    <DeleteReasonsView
+      onBack={() => setView('main')}
+      onConfirmed={(feedback) => { setDeleteFeedback(feedback); setView('deleteProcessing'); }}
+    />
+  );
   if (view === 'deleteProcessing') return (
     <DeleteProcessingView
+      feedback={deleteFeedback}
       onDone={() => setView('deleteFarewell')}
       onFailed={(msg) => setView({ name: 'deleteFailed', msg })}
     />
@@ -136,6 +143,7 @@ function EditProfileView({ profile, onBack, onSaved }) {
 
         <div className="field">
           <label>Фото профиля — минимум 1, максимум 5</label>
+          {loadingPhotos && <div className="loading-gear" style={{ fontSize: 22, marginBottom: 0 }}>⚙️</div>}
           {!loadingPhotos && <PhotoManager userId={profile.id} photos={photos} onChange={setPhotos} />}
         </div>
 
@@ -307,7 +315,7 @@ function DeleteReasonsView({ onBack, onConfirmed }) {
           className="btn btn-primary"
           style={{ background: '#ff8b7d', marginTop: 10 }}
           disabled={!canSubmit}
-          onClick={onConfirmed}
+          onClick={() => onConfirmed({ reasons: selected, other: other.trim() })}
         >
           Удалить профиль
         </button>
@@ -316,7 +324,7 @@ function DeleteReasonsView({ onBack, onConfirmed }) {
   );
 }
 
-function DeleteProcessingView({ onDone, onFailed }) {
+function DeleteProcessingView({ feedback, onDone, onFailed }) {
   React.useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -324,6 +332,17 @@ function DeleteProcessingView({ onDone, onFailed }) {
         onFailed('Сессия потерялась — попробуй выйти и войти заново, потом повтори удаление');
         return;
       }
+
+      // Сохраняем причину ухода отдельно, ДО удаления аккаунта — эта запись
+      // не привязана внешним ключом к пользователю и переживёт само удаление
+      if (feedback && (feedback.reasons?.length > 0 || feedback.other)) {
+        await supabase.from('account_deletion_feedback').insert({
+          user_id: session.user.id,
+          reasons: feedback.reasons || [],
+          other_text: feedback.other || null,
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke('delete-account', {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -352,7 +371,7 @@ function DeleteProcessingView({ onDone, onFailed }) {
 
   return (
     <div className="center-msg">
-      <div style={{ fontSize: 30, marginBottom: 14 }}>⚙️</div>
+      <div className="loading-gear" style={{ fontSize: 30 }}>⚙️</div>
       <p>Удаляю твои данные...</p>
     </div>
   );
