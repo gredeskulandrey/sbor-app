@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
 import Avatar from '../Avatar.jsx';
+import Loading from '../Loading.jsx';
 
 export default function AttendanceConfirm({ eventId, onDone }) {
   const [event, setEvent] = useState(null);
@@ -90,7 +91,7 @@ export default function AttendanceConfirm({ eventId, onDone }) {
     onDone();
   }
 
-  if (loading || !event) return <div className="center-msg">Загрузка...</div>;
+  if (loading || !event) return <Loading />;
 
   return (
     <div className="screen" style={{ overflowY: 'auto' }}>
@@ -102,7 +103,7 @@ export default function AttendanceConfirm({ eventId, onDone }) {
         }}>
           Это важно: отметка о явке напрямую влияет на рейтинг гостя. Если поставить «не пришёл» тому,
           кто на самом деле был на встрече — его рейтинг явки незаслуженно снизится. Пожалуйста, отмечай
-          только тех, кто <b style={{ color: 'var(--text)' }}>действительно</b> пришёл на «{event.title}».
+          только тех, кто <b style={{ color: 'var(--text)' }}>действительно</b> пришёл на встречу.
         </div>
 
         {attendees.map((a) => (
