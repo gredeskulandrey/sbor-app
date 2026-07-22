@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
+import { friendlyAuthError } from '../friendlyError.js';
 
 export default function EmailInput({ value, onChange, onBack, onSent }) {
   const [error, setError] = useState('');
@@ -23,7 +24,7 @@ export default function EmailInput({ value, onChange, onBack, onSent }) {
     const { error: sendError } = await supabase.auth.signInWithOtp({ email: v });
     setLoading(false);
     if (sendError) {
-      setError('Не получилось отправить код: ' + sendError.message);
+      setError(friendlyAuthError(sendError.message));
       return;
     }
     onSent();
