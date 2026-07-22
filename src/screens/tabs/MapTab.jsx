@@ -132,25 +132,6 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
     });
   }
 
-  if (showCityList) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <div className="topbar"><h2>Выбери город</h2></div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>
-          {CITIES.map((c) => (
-            <div
-              key={c}
-              className={'city-item' + (city === c ? ' active' : '')}
-              onClick={() => { onCityChange(c); setShowCityList(false); }}
-            >
-              <span>{c}</span>{city === c && <span>✓</span>}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
       <div className="topbar">
@@ -185,6 +166,26 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
                 <div className="meta">
                   <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Список городов — накладывается ПОВЕРХ карты, а не заменяет её в разметке.
+          Если сделать это отдельным return(), контейнер карты пересоздаётся при
+          возврате назад, и живая карта Яндекса ломается (именно это и происходило). */}
+      {showCityList && (
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+          <div className="topbar"><h2>Выбери город</h2></div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {CITIES.map((c) => (
+              <div
+                key={c}
+                className={'city-item' + (city === c ? ' active' : '')}
+                onClick={() => { onCityChange(c); setShowCityList(false); }}
+              >
+                <span>{c}</span>{city === c && <span>✓</span>}
               </div>
             ))}
           </div>
