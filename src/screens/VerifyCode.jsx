@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
+import { friendlyAuthError } from '../friendlyError.js';
 
-export default function VerifyCode({ authMethod, email, phone, requestId, onBack, onVerified }) {
+export default function VerifyCode({ authMethod, email, phone, requestId: initialRequestId, onBack, onVerified }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [requestId, setRequestId] = useState(initialRequestId);
+  const [resentJustNow, setResentJustNow] = useState(false);
 
   async function handleSubmit() {
     if (code.length !== 6) {
@@ -28,8 +32,6 @@ export default function VerifyCode({ authMethod, email, phone, requestId, onBack
       const hasProfile = await checkProfileExists(data.session.user.id);
       onVerified(hasProfile);
     } else {
-      // Телефон: проверяем код через Telegram Gateway, а затем переходим по
-      // ссылке, которую нам вернула наша функция — она и оформит настоящий вход.
       const { data, error: fnError } = await supabase.functions.invoke('verify-phone-code', {
         body: { request_id: requestId, code, phone_number: phone },
       });
@@ -40,6 +42,31 @@ export default function VerifyCode({ authMethod, email, phone, requestId, onBack
       }
       window.location.href = data.action_link;
     }
+  }
+
+  async function handleResend() {
+    setResending(true);
+    setError('');
+    setResentJustNow(false);
+
+    if (authMethod === 'email') {
+      const { error: sendError } = await supabase.auth.signInWithOtp({ email });
+      setResending(false);
+      if (sendError) { setError(friendlyAuthError(sendError.message)); return; }
+    } else {
+      const { data, error: fnError } = await supabase.functions.invoke('send-phone-code', {
+        body: { phone_number: phone },
+      });
+      setResending(false);
+      if (fnError || !data?.request_id) {
+        setError('Не получилось отправить код повторно. Попробуй чуть позже.');
+        return;
+      }
+      setRequestId(data.request_id);
+    }
+    setCode('');
+    setResentJustNow(true);
+    setTimeout(() => setResentJustNow(false), 4000);
   }
 
   async function checkProfileExists(userId) {
@@ -70,9 +97,15 @@ export default function VerifyCode({ authMethod, email, phone, requestId, onBack
             style={{ letterSpacing: 5, fontSize: 19, textAlign: 'center', fontFamily: "'IBM Plex Mono',monospace" }}
           />
           {error && <div className="field-error">{error}</div>}
+          {resentJustNow && !error && (
+            <div style={{ fontSize: 11.5, color: 'var(--mint)', marginTop: 5 }}>Код отправлен повторно</div>
+          )}
         </div>
-        <button className="btn btn-primary" disabled={loading} onClick={handleSubmit}>
+        <button className="btn btn-primary" disabled={loading} onClick={handleSubmit} style={{ marginBottom: 12 }}>
           {loading ? 'Проверяем...' : 'Подтвердить'}
+        </button>
+        <button className="btn btn-ghost" disabled={resending} onClick={handleResend}>
+          {resending ? 'Отправляем...' : 'Отправить код ещё раз'}
         </button>
       </div>
     </div>
