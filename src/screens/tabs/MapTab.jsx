@@ -1,18 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
-import { CITIES, CITY_COORDS, catInfo } from '../../constants.js';
+import { CITIES, CITY_COORDS, TOPICS, catInfo } from '../../constants.js';
 import { loadYmaps } from '../../loadYmaps.js';
 import { isEventPast } from '../../isEventPast.js';
+import { formatEventDate, formatEventTime } from '../../formatDateTime.js';
 
 export default function MapTab({ city, onCityChange, onOpenEvent }) {
   const [showCityList, setShowCityList] = useState(false);
   const [events, setEvents] = useState([]);
+  const [filterTopic, setFilterTopic] = useState(null); // null = "Все"
+  const [groupPopup, setGroupPopup] = useState(null); // список встреч на одном адресе, если их несколько
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const ymaps3Ref = useRef(null);
-  const markersRef = useRef([]); // храним свои маркеры, чтобы потом корректно их убирать
+  const markersRef = useRef([]);
 
-  // Загружаем события выбранного города
   useEffect(() => {
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -28,8 +30,6 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
     setEvents((data || []).filter((e) => !isEventPast(e)));
   }
 
-  // Создаём карту один раз — контейнер карты теперь ВСЕГДА остаётся в разметке
-  // (список городов накладывается поверх), поэтому карта больше не "теряет" свой div
   useEffect(() => {
     let cancelled = false;
     loadYmaps().then((ymaps3) => {
@@ -51,18 +51,29 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Перецентровываем карту при смене города
   useEffect(() => {
     if (!mapRef.current) return;
     const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
     mapRef.current.setLocation({ center: [c.lon, c.lat], zoom: c.z, duration: 300 });
   }, [city]);
 
-  // Перерисовываем точки при изменении списка событий
   useEffect(() => {
     renderMarkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
+  }, [events, filterTopic]);
+
+  const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
+
+  // Группируем встречи, поставленные по одному и тому же адресу — на карте это одна точка со счётчиком
+  function groupByAddress(list) {
+    const map = new Map();
+    list.forEach((e) => {
+      const key = `${e.venue_name || ''}|${e.address || ''}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(e);
+    });
+    return Array.from(map.values());
+  }
 
   function renderMarkers() {
     const ymaps3 = ymaps3Ref.current;
@@ -72,23 +83,60 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
     markersRef.current.forEach((marker) => map.removeChild(marker));
     markersRef.current = [];
 
-    events.forEach((e) => {
+    const groups = groupByAddress(visibleEvents);
+
+    groups.forEach((group) => {
+      const first = group[0];
       const el = document.createElement('div');
       el.style.cssText = `
         width:36px; height:36px; border-radius:50% 50% 50% 0; transform:rotate(45deg);
         background:#ff6b57; display:flex; align-items:center; justify-content:center;
-        box-shadow:0 6px 14px rgba(0,0,0,.4); cursor:pointer; font-size:16px;
+        box-shadow:0 6px 14px rgba(0,0,0,.4); cursor:pointer; font-size:16px; position:relative;
       `;
       const inner = document.createElement('span');
-      inner.textContent = catInfo(e.category).ic;
+      inner.textContent = catInfo(first.category).ic;
       inner.style.transform = 'rotate(-45deg)';
       el.appendChild(inner);
-      el.onclick = () => onOpenEvent(e.id);
 
-      const marker = new ymaps3.YMapMarker({ coordinates: [e.lon, e.lat] }, el);
+      if (group.length > 1) {
+        const badge = document.createElement('div');
+        badge.textContent = String(group.length);
+        badge.style.cssText = `
+          position:absolute; top:-6px; right:-6px; background:var(--gold); color:#1a0d09;
+          font-size:10px; font-weight:700; border-radius:50%; width:18px; height:18px;
+          display:flex; align-items:center; justify-content:center; transform:rotate(-45deg);
+        `;
+        el.appendChild(badge);
+      }
+
+      el.onclick = () => {
+        if (group.length === 1) onOpenEvent(first.id);
+        else setGroupPopup(group);
+      };
+
+      const marker = new ymaps3.YMapMarker({ coordinates: [first.lon, first.lat] }, el);
       map.addChild(marker);
       markersRef.current.push(marker);
     });
+  }
+
+  if (showCityList) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div className="topbar"><h2>Выбери город</h2></div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {CITIES.map((c) => (
+            <div
+              key={c}
+              className={'city-item' + (city === c ? ' active' : '')}
+              onClick={() => { onCityChange(c); setShowCityList(false); }}
+            >
+              <span>{c}</span>{city === c && <span>✓</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -97,24 +145,34 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
         <h2>Карта</h2>
         <div className="city-pill" onClick={() => setShowCityList(true)}>📍 {city}</div>
       </div>
+
+      <div className="map-filters">
+        <div className={'chip' + (!filterTopic ? ' active' : '')} onClick={() => setFilterTopic(null)}>Все</div>
+        {TOPICS.map((t) => (
+          <div key={t.id} className={'chip' + (filterTopic === t.id ? ' active' : '')} onClick={() => setFilterTopic(t.id)}>
+            {t.ic} {t.label}
+          </div>
+        ))}
+      </div>
+
       <div className="map-canvas" style={{ flex: 1 }}>
         <div ref={mapContainerRef} className="map-live-frame" />
       </div>
 
-      {/* Список городов — накладывается ПОВЕРХ карты (в т.ч. поверх собственных
-          служебных кнопок Яндекса вроде "Открыть в Яндекс.Картах"), а не заменяет
-          карту в разметке, иначе контейнер карты пропадает из DOM и ломается */}
-      {showCityList && (
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
-          <div className="topbar"><h2>Выбери город</h2></div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {CITIES.map((c) => (
-              <div
-                key={c}
-                className={'city-item' + (city === c ? ' active' : '')}
-                onClick={() => { onCityChange(c); setShowCityList(false); }}
-              >
-                <span>{c}</span>{city === c && <span>✓</span>}
+      {groupPopup && (
+        <div
+          onClick={() => setGroupPopup(null)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 500, display: 'flex', alignItems: 'flex-end' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 10 }}>Встречи по этому адресу ({groupPopup.length})</h3>
+            {groupPopup.map((e) => (
+              <div key={e.id} className="ticket" style={{ margin: '0 0 10px', cursor: 'pointer' }} onClick={() => { setGroupPopup(null); onOpenEvent(e.id); }}>
+                <div className="ticket-cat">{catInfo(e.category).ic} {catInfo(e.category).label}</div>
+                <h3>{e.title}</h3>
+                <div className="meta">
+                  <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
+                </div>
               </div>
             ))}
           </div>
