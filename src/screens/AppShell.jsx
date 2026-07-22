@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
+import Loading from '../Loading.jsx';
 import MapTab from './tabs/MapTab.jsx';
 import EventsTab from './tabs/EventsTab.jsx';
 import MyMeetingsTab from './tabs/MyMeetingsTab.jsx';
@@ -77,7 +78,7 @@ export default function AppShell({ onSignOut }) {
 
   // Пока не проверили или пока остались неподтверждённые явки — это первый экран, без исключений
   if (pendingAttendanceIds === null) {
-    return <div className="center-msg">Загрузка...</div>;
+    return <Loading />;
   }
   if (pendingAttendanceIds.length > 0) {
     return (
