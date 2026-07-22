@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { catInfo } from '../../constants.js';
 import { isEventPast } from '../../isEventPast.js';
+import { formatEventDate, formatEventTime } from '../../formatDateTime.js';
+import Loading from '../../Loading.jsx';
 
 export default function MyMeetingsTab({ onOpenEvent }) {
   const [subTab, setSubTab] = useState('upcoming');
@@ -50,6 +52,7 @@ export default function MyMeetingsTab({ onOpenEvent }) {
         <button className={subTab === 'past' ? 'active' : ''} onClick={() => setSubTab('past')}>Прошедшие</button>
         <button className={subTab === 'created' ? 'active' : ''} onClick={() => setSubTab('created')}>Мои события</button>
       </div>
+      {loading && <Loading />}
       {!loading && events.length === 0 && (
         <div className="empty">
           {subTab === 'created' ? 'Тут пока пусто, самое время собрать встречу!' : 'Пусто. Загляни на карту, чтобы найти что-то интересное'}
@@ -61,7 +64,7 @@ export default function MyMeetingsTab({ onOpenEvent }) {
           <h3>{e.title}</h3>
           <div className="meta">
             <span>📍 {e.is_online ? e.online_link : (e.address || e.venue_name)}</span>
-            <span>🕐 {e.event_date} {e.event_time}</span>
+            <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
           </div>
         </div>
       ))}
