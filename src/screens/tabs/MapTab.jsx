@@ -15,7 +15,23 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
   const ymaps3Ref = useRef(null);
   const markersRef = useRef([]);
 
+  // Один общий эффект на смену города — раньше перемещение камеры (с анимацией)
+  // и перерисовка точек срабатывали двумя отдельными эффектами почти одновременно,
+  // и, судя по всему, конфликтовали друг с другом, из-за чего карта "чернела".
   useEffect(() => {
+    // Сначала убираем старые точки, чтобы они не остались висеть поверх новой локации
+    if (mapRef.current) {
+      markersRef.current.forEach((marker) => {
+        try { mapRef.current.removeChild(marker); } catch { /* точка уже могла быть убрана */ }
+      });
+      markersRef.current = [];
+
+      const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
+      try {
+        // Без анимации (duration) — резкий переход надёжнее на разных устройствах
+        mapRef.current.setLocation({ center: [c.lon, c.lat], zoom: c.z });
+      } catch { /* если карта в этот момент ещё не готова — просто пропускаем кадр */ }
+    }
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city]);
@@ -52,12 +68,6 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
-    mapRef.current.setLocation({ center: [c.lon, c.lat], zoom: c.z, duration: 300 });
-  }, [city]);
-
-  useEffect(() => {
     renderMarkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, filterTopic]);
@@ -80,7 +90,9 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
     const map = mapRef.current;
     if (!ymaps3 || !map) return;
 
-    markersRef.current.forEach((marker) => map.removeChild(marker));
+    markersRef.current.forEach((marker) => {
+      try { map.removeChild(marker); } catch { /* уже могла быть убрана раньше */ }
+    });
     markersRef.current = [];
 
     const groups = groupByAddress(visibleEvents);
