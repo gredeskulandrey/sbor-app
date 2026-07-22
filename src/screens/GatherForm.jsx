@@ -8,10 +8,12 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [topic, setTopic] = useState('bars');
   const [venue, setVenue] = useState('');
   const [address, setAddress] = useState('');
+  const [venueLink, setVenueLink] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
+  const [rules, setRules] = useState('');
   const [limit, setLimit] = useState(4);
   const [ageLimit, setAgeLimit] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,7 +28,6 @@ export default function GatherForm({ city, onBack, onCreated }) {
 
   function handleToggle(next) {
     setIsOnline(next);
-    // при переключении подставляем тему по умолчанию для нового списка, чтобы не остаться с несуществующей темой
     setTopic(next ? ONLINE_TAGS[0].id : TOPICS[0].id);
   }
 
@@ -38,7 +39,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
       }
     } else {
       if (!venue.trim() || !address.trim() || !date || !time) {
-        setError('Заполни название места, адрес, дату и время');
+        setError('Заполни название локации, адрес, дату и время');
         return;
       }
     }
@@ -65,18 +66,27 @@ export default function GatherForm({ city, onBack, onCreated }) {
     }
 
     const { data: { session } } = await supabase.auth.getSession();
+
+    // Название карточки: для офлайн — это сама введённая локация ("Ресторан «Пушкин»"),
+    // для онлайн (там нет физического места) — берём тему
+    const title = isOnline
+      ? `${currentTopics.find((t) => t.id === topic)?.label}: встреча`
+      : venue.trim();
+
     const { error: insertError } = await supabase.from('events').insert({
       organizer_id: session.user.id,
-      title: `${currentTopics.find((t) => t.id === topic)?.label}: встреча`,
+      title,
       category: topic,
       is_online: isOnline,
       city: isOnline ? null : city,
       venue_name: isOnline ? null : venue.trim(),
       address: isOnline ? null : address.trim(),
+      venue_link: isOnline ? null : (venueLink.trim() || null),
       online_link: isOnline ? onlineLink.trim() : null,
       event_date: date,
       event_time: time,
       description: description.trim(),
+      rules: rules.trim() || null,
       participant_limit: limit,
       age_restriction: ageLimit || null,
       lat: isOnline ? null : coords.lat,
@@ -92,7 +102,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
   }
 
   return (
-    <div className="screen" style={{ overflowY: 'auto' }}>
+    <div className="screen">
       <div className="auth-wrap" style={{ padding: '16px 20px' }}>
         <div className="backbtn" onClick={onBack}>←</div>
         <h2 style={{ fontSize: 17, marginBottom: 16 }}>Собрать встречу</h2>
@@ -124,12 +134,16 @@ export default function GatherForm({ city, onBack, onCreated }) {
         ) : (
           <>
             <div className="field">
-              <label>Название места</label>
-              <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder="Например: Клуб «Кубик»" />
+              <label>Название локации</label>
+              <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder='Например, ресторан «Пушкин»' />
             </div>
             <div className="field">
               <label>Адрес</label>
               <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Улица, дом" />
+            </div>
+            <div className="field">
+              <label>Ссылка на заведение (необязательно)</label>
+              <input value={venueLink} onChange={(e) => setVenueLink(e.target.value)} placeholder="Сайт, страница в 2ГИС и т.д." />
             </div>
           </>
         )}
@@ -156,6 +170,10 @@ export default function GatherForm({ city, onBack, onCreated }) {
         <div className="field">
           <label>О встрече</label>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="О чём встреча?" />
+        </div>
+        <div className="field">
+          <label>Правила встречи (необязательно)</label>
+          <textarea value={rules} onChange={(e) => setRules(e.target.value)} placeholder="Дресс-код, что взять с собой и т.д." />
         </div>
         <div className="field">
           <label>Лимит участников</label>
