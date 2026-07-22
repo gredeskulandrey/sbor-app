@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient.js';
 import { catInfo, CITY_PREPOSITIONAL } from '../../constants.js';
 import { isEventPast } from '../../isEventPast.js';
+import { formatEventDate, formatEventTime } from '../../formatDateTime.js';
+import Loading from '../../Loading.jsx';
 
 export default function EventsTab({ city, onOpenEvent }) {
   const [mode, setMode] = useState('offline');
@@ -32,8 +34,9 @@ export default function EventsTab({ city, onOpenEvent }) {
         <button className={mode === 'offline' ? 'active' : ''} onClick={() => setMode('offline')}>Офлайн</button>
         <button className={mode === 'online' ? 'active' : ''} onClick={() => setMode('online')}>Онлайн</button>
       </div>
+      {loading && <Loading />}
       {!loading && events.length === 0 && (
-        <div className="empty">Событий пока нет — попробуй другой фильтр или создай своё 🎟️</div>
+        <div className="empty">Событий пока нет — попробуй другой фильтр или создай своё.</div>
       )}
       {events.map((e) => (
         <div className="ticket" key={e.id} onClick={() => onOpenEvent(e.id)} style={{ cursor: 'pointer' }}>
@@ -41,7 +44,7 @@ export default function EventsTab({ city, onOpenEvent }) {
           <h3>{e.title}</h3>
           <div className="meta">
             <span>📍 {e.is_online ? e.online_link : (e.address || e.venue_name)}</span>
-            <span>🕐 {e.event_date} {e.event_time}</span>
+            <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
           </div>
         </div>
       ))}
