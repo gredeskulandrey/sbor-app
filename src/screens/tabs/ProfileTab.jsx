@@ -6,6 +6,7 @@ import { computeAchievements } from '../../computeAchievements.js';
 import SettingsScreen from '../SettingsScreen.jsx';
 import Avatar from '../../Avatar.jsx';
 import { getPrimaryPhoto } from '../../getPrimaryPhoto.js';
+import Loading from '../../Loading.jsx';
 
 function calcAge(birthDateStr) {
   if (!birthDateStr) return null;
@@ -75,7 +76,7 @@ export default function ProfileTab({ onSignOut }) {
     await onSignOut();
   }
 
-  if (loading) return <div className="center-msg">Загрузка профиля...</div>;
+  if (loading) return <Loading text="Загрузка профиля..." />;
   if (!profile) return <div className="center-msg">Не получилось загрузить профиль</div>;
 
   if (showSettings) {
