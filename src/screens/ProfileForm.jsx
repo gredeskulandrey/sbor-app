@@ -185,17 +185,6 @@ export default function ProfileForm({ onSaved }) {
         <button className="btn btn-primary" disabled={saving} onClick={handleSubmit}>
           {saving ? 'Сохраняем...' : 'Продолжить'}
         </button>
-
-        <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginTop: 14, lineHeight: 1.5 }}>
-          Продолжая, вы принимаете{' '}
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--text-faint)', textDecoration: 'underline' }}>
-            пользовательское соглашение
-          </a>{' '}
-          и соглашаетесь с{' '}
-          <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'var(--text-faint)', textDecoration: 'underline' }}>
-            обработкой персональных данных
-          </a>
-        </p>
       </div>
     </div>
   );
