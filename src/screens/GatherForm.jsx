@@ -10,7 +10,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [address, setAddress] = useState('');
   const [venueLink, setVenueLink] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
-  const [dateDigits, setDateDigits] = useState(''); // сырые цифры даты (до 8), собираются в шаблон __.__.____
+  const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   const [rules, setRules] = useState('');
@@ -19,33 +19,10 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const DATE_TEMPLATE = '__.__.____';
-
-  // Собирает шаблон "__.__.____" с уже введёнными цифрами вместо подчёркиваний —
-  // видно сразу, сколько ещё осталось ввести и в каком формате
-  function buildDateMask(digits) {
-    let out = '';
-    let di = 0;
-    for (const ch of DATE_TEMPLATE) {
-      if (ch === '_') { out += digits[di] !== undefined ? digits[di] : '_'; di++; }
-      else out += ch;
-    }
-    return out;
-  }
-
-  function handleDateInput(raw) {
-    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
-    setDateDigits(digits);
-  }
-
-  // Из введённых цифр (ДДММГГГГ) получаем ISO-дату (YYYY-MM-DD), только если введены все 8
-  function parseDateDigits(digits) {
-    if (digits.length !== 8) return null;
-    const d = digits.slice(0, 2), mo = digits.slice(2, 4), y = digits.slice(4, 8);
-    return `${y}-${mo}-${d}`;
-  }
-
-  const date = parseDateDigits(dateDigits);
+  const today = new Date().toISOString().slice(0, 10);
+  const maxDateObj = new Date();
+  maxDateObj.setDate(maxDateObj.getDate() + 30);
+  const maxDateStr = maxDateObj.toISOString().slice(0, 10);
 
   const currentTopics = isOnline ? ONLINE_TAGS : TOPICS;
 
@@ -68,7 +45,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
     }
 
     if (!date) {
-      setError('Введи дату полностью в формате ДД.ММ.ГГГГ');
+      setError('Выбери дату встречи');
       return;
     }
 
@@ -125,7 +102,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
       event_time: time,
       description: description.trim(),
       rules: rules.trim() || null,
-      participant_limit: limit,
+      participant_limit: Math.min(30, Math.max(1, parseInt(limit, 10) || 1)),
       age_restriction: ageLimit || null,
       lat: isOnline ? null : coords.lat,
       lon: isOnline ? null : coords.lon,
@@ -181,7 +158,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
             </div>
             <div className="field">
               <label>Ссылка на заведение (необязательно)</label>
-              <input value={venueLink} onChange={(e) => setVenueLink(e.target.value)} placeholder="Сайт, страница в 2ГИС и т.д." />
+              <input value={venueLink} onChange={(e) => setVenueLink(e.target.value)} placeholder="Сайт, ссылка на картах и т.д." />
             </div>
           </>
         )}
@@ -189,11 +166,11 @@ export default function GatherForm({ city, onBack, onCreated }) {
         <div className="field">
           <label>Дата</label>
           <input
-            type="text"
-            inputMode="numeric"
-            value={buildDateMask(dateDigits)}
-            onChange={(e) => handleDateInput(e.target.value)}
-            onFocus={(e) => e.target.setSelectionRange(0, 0)}
+            type="date"
+            min={today}
+            max={maxDateStr}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
           />
         </div>
         <div className="field">
@@ -210,7 +187,19 @@ export default function GatherForm({ city, onBack, onCreated }) {
         </div>
         <div className="field">
           <label>Лимит участников</label>
-          <input type="number" min={1} max={50} value={limit} onChange={(e) => setLimit(Number(e.target.value))} />
+          <input
+            type="number"
+            min={1}
+            max={30}
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+            onBlur={() => {
+              let n = parseInt(limit, 10);
+              if (isNaN(n) || n < 1) n = 1;
+              if (n > 30) n = 30;
+              setLimit(n);
+            }}
+          />
         </div>
         <div className="field">
           <label>Возрастной ценз (если нужен)</label>
