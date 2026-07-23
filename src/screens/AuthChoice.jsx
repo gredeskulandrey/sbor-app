@@ -23,7 +23,7 @@ export default function AuthChoice({ onEmail, onPhone }) {
           </div>
         </div>
 
-        <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginTop: 14, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginTop: 'auto', paddingTop: 14, lineHeight: 1.5 }}>
           Продолжая, вы принимаете{' '}
           <a href="https://sbor-app.vercel.app/#" target="_blank" rel="noreferrer" style={{ color: 'var(--text-faint)', textDecoration: 'underline' }}>
             пользовательское соглашение
