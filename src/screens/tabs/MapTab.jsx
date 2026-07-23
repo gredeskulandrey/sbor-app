@@ -74,16 +74,23 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
 
   const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
 
-  // Группируем встречи по координатам (а не по тексту адреса) — так надёжнее:
-  // даже если название места или адрес чуть отличаются, но точка на карте та же самая
+  // Группируем встречи, если совпадает адрес ИЛИ название карточки — без учёта
+  // регистра букв (раньше группировка зависела от координат геокодирования,
+  // которые могли чуть отличаться даже для одного и того же места)
+  function normalize(s) { return (s || '').trim().toLowerCase(); }
+
   function groupByLocation(list) {
-    const map = new Map();
+    const groups = [];
     list.forEach((e) => {
-      const key = `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(e);
+      const addr = normalize(e.address);
+      const title = normalize(e.title);
+      const existing = groups.find((g) =>
+        g.some((other) => (addr && normalize(other.address) === addr) || (title && normalize(other.title) === title))
+      );
+      if (existing) existing.push(e);
+      else groups.push([e]);
     });
-    return Array.from(map.values());
+    return groups;
   }
 
   function renderMarkers() {
@@ -146,169 +153,10 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
       {groupPopup && (
         <div
           onClick={() => setGroupPopup(null)}
-          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 500, display: 'flex', alignItems: 'flex-end' }}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999998, display: 'flex', alignItems: 'flex-end' }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
             <h3 style={{ fontSize: 15, marginBottom: 10 }}>Встречи в этой точке ({groupPopup.length})</h3>
-            {groupPopup.map((e) => (
-              <div key={e.id} className="ticket" style={{ margin: '0 0 10px', cursor: 'pointer' }} onClick={() => { setGroupPopup(null); onOpenEvent(e.id); }}>
-                <div className="ticket-cat">{catInfo(e.category).ic} {catInfo(e.category).label}</div>
-                <h3>{e.title}</h3>
-                <div className="meta">
-                  <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Список городов — накладывается ПОВЕРХ карты, а не заменяет её в разметке.
-          Если сделать это отдельным return(), контейнер карты пересоздаётся при
-          возврате назад, и живая карта Яндекса ломается (именно это и происходило). */}
-      {showCityList && (
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
-          <div className="topbar"><h2>Выбери город</h2></div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {CITIES.map((c) => (
-              <div
-                key={c}
-                className={'city-item' + (city === c ? ' active' : '')}
-                onClick={() => { onCityChange(c); setShowCityList(false); }}
-              >
-                <span>{c}</span>{city === c && <span>✓</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}  }, [city]);
-
-  async function loadEvents() {
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .eq('is_online', false)
-      .eq('city', city)
-      .not('lat', 'is', null);
-    setEvents((data || []).filter((e) => !isEventPast(e)));
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    loadYmaps().then((ymaps3) => {
-      if (cancelled || !mapContainerRef.current || mapRef.current) return;
-      ymaps3Ref.current = ymaps3;
-      const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } = ymaps3;
-      const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
-
-      const map = new YMap(mapContainerRef.current, {
-        location: { center: [c.lon, c.lat], zoom: c.z },
-      });
-      map.addChild(new YMapDefaultSchemeLayer());
-      map.addChild(new YMapDefaultFeaturesLayer());
-
-      mapRef.current = map;
-      renderMarkers();
-    });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    renderMarkers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, filterTopic]);
-
-  const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
-
-  // Группируем встречи, поставленные по одному и тому же адресу — на карте это одна точка со счётчиком
-  function groupByAddress(list) {
-    const map = new Map();
-    list.forEach((e) => {
-      const key = `${e.venue_name || ''}|${e.address || ''}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(e);
-    });
-    return Array.from(map.values());
-  }
-
-  function renderMarkers() {
-    const ymaps3 = ymaps3Ref.current;
-    const map = mapRef.current;
-    if (!ymaps3 || !map) return;
-
-    markersRef.current.forEach((marker) => {
-      try { map.removeChild(marker); } catch { /* уже могла быть убрана раньше */ }
-    });
-    markersRef.current = [];
-
-    const groups = groupByAddress(visibleEvents);
-
-    groups.forEach((group) => {
-      const first = group[0];
-      const el = document.createElement('div');
-      el.style.cssText = `
-        width:36px; height:36px; border-radius:50% 50% 50% 0; transform:rotate(45deg);
-        background:#ff6b57; display:flex; align-items:center; justify-content:center;
-        box-shadow:0 6px 14px rgba(0,0,0,.4); cursor:pointer; font-size:16px; position:relative;
-      `;
-      const inner = document.createElement('span');
-      inner.textContent = catInfo(first.category).ic;
-      inner.style.transform = 'rotate(-45deg)';
-      el.appendChild(inner);
-
-      if (group.length > 1) {
-        const badge = document.createElement('div');
-        badge.textContent = String(group.length);
-        badge.style.cssText = `
-          position:absolute; top:-6px; right:-6px; background:var(--gold); color:#1a0d09;
-          font-size:10px; font-weight:700; border-radius:50%; width:18px; height:18px;
-          display:flex; align-items:center; justify-content:center; transform:rotate(-45deg);
-        `;
-        el.appendChild(badge);
-      }
-
-      el.onclick = () => {
-        if (group.length === 1) onOpenEvent(first.id);
-        else setGroupPopup(group);
-      };
-
-      const marker = new ymaps3.YMapMarker({ coordinates: [first.lon, first.lat] }, el);
-      map.addChild(marker);
-      markersRef.current.push(marker);
-    });
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
-      <div className="topbar">
-        <h2>Карта</h2>
-        <div className="city-pill" onClick={() => setShowCityList(true)}>📍 {city}</div>
-      </div>
-
-      <div className="map-filters">
-        <div className={'chip' + (!filterTopic ? ' active' : '')} onClick={() => setFilterTopic(null)}>Все</div>
-        {TOPICS.map((t) => (
-          <div key={t.id} className={'chip' + (filterTopic === t.id ? ' active' : '')} onClick={() => setFilterTopic(t.id)}>
-            {t.ic} {t.label}
-          </div>
-        ))}
-      </div>
-
-      <div className="map-canvas" style={{ flex: 1 }}>
-        <div ref={mapContainerRef} className="map-live-frame" />
-      </div>
-
-      {groupPopup && (
-        <div
-          onClick={() => setGroupPopup(null)}
-          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 500, display: 'flex', alignItems: 'flex-end' }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
-            <h3 style={{ fontSize: 15, marginBottom: 10 }}>Встречи по этому адресу ({groupPopup.length})</h3>
             {groupPopup.map((e) => (
               <div key={e.id} className="ticket" style={{ margin: '0 0 10px', cursor: 'pointer' }} onClick={() => { setGroupPopup(null); onOpenEvent(e.id); }}>
                 <div className="ticket-cat">{catInfo(e.category).ic} {catInfo(e.category).label}</div>
