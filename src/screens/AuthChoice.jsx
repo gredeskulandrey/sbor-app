@@ -22,6 +22,17 @@ export default function AuthChoice({ onEmail, onPhone }) {
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Код придёт в Telegram</div>
           </div>
         </div>
+
+        <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', marginTop: 14, lineHeight: 1.5 }}>
+          Продолжая, вы принимаете{' '}
+          <a href="https://sbor-app.vercel.app/#" target="_blank" rel="noreferrer" style={{ color: 'var(--text-faint)', textDecoration: 'underline' }}>
+            пользовательское соглашение
+          </a>{' '}
+          и соглашаетесь с{' '}
+          <a href="https://sbor-app.vercel.app/#" target="_blank" rel="noreferrer" style={{ color: 'var(--text-faint)', textDecoration: 'underline' }}>
+            обработкой персональных данных
+          </a>
+        </p>
       </div>
     </div>
   );
