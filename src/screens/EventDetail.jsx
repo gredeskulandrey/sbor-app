@@ -78,6 +78,12 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
     const sure = window.confirm(`Убрать ${name} со встречи? Встреча пропадёт из его(её) списка.`);
     if (!sure) return;
     setBusy(true);
+    // Сообщаем гостю, что его отклонили — до того, как удалить его из встречи
+    await supabase.from('user_notifications').insert({
+      user_id: guest.user_id,
+      event_id: eventId,
+      message: `Организатор отклонил тебя как гостя на встрече «${event.title}». Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
+    });
     await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', guest.user_id);
     await load();
     setBusy(false);
@@ -86,7 +92,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
   async function handleCancelMeeting() {
     if (attendees.length > 0) {
       const sure = window.confirm(
-        `На встречу уже откликнулись участники (${attendees.length}). Если удалишь встречу, они не получат уведомление автоматически — предупреди их сам(а) в чате перед отменой. Точно хочешь отменить встречу?`
+        `На встречу уже откликнулись участники (${attendees.length}). Они автоматически получат уведомление об отмене. Точно хочешь отменить встречу?`
       );
       if (!sure) return;
     } else {
@@ -94,6 +100,15 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
       if (!sure) return;
     }
     setBusy(true);
+    // Сообщаем всем гостям об отмене — обязательно до удаления самой встречи,
+    // иначе проверка доступа не даст записать уведомление
+    for (const a of attendees) {
+      await supabase.from('user_notifications').insert({
+        user_id: a.user_id,
+        event_id: eventId,
+        message: `Встреча «${event.title}», на которую ты записался(-ась), была отменена организатором. Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
+      });
+    }
     await supabase.from('events').delete().eq('id', eventId);
     setBusy(false);
     onBack();
