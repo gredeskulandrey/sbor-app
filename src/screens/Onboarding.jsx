@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const ONBOARDING_SLIDES = [
   { ic: '🗺️', title: 'Карта — встречи рядом', text: 'Открывай вкладку «Карта», выбирай город сверху и смотри, что происходит поблизости прямо сейчас. Фильтруй по темам — они появляются в один клик.' },
@@ -22,12 +22,24 @@ export default function Onboarding({ onFinish }) {
     if (idx > 0) setIdx((i) => i - 1);
   }
 
+  // Автоматическое пролистывание — каждый слайд держится 15 секунд, как в сторис
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLast) onFinish();
+      else setIdx((i) => i + 1);
+    }, 15000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx]);
+
   return (
     <div className="screen" style={{ padding: 0 }}>
       <div style={{ padding: '16px 16px 0' }}>
         <div className="onboarding-progress">
           {ONBOARDING_SLIDES.map((s, i) => (
-            <div key={i} className={'onboarding-seg' + (i <= idx ? ' filled' : '')} />
+            <div key={i} className={'onboarding-seg' + (i < idx ? ' filled' : '')}>
+              {i === idx && <div key={idx} className="onboarding-seg-fill" />}
+            </div>
           ))}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 4px' }}>
