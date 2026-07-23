@@ -74,6 +74,156 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
 
   const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
 
+  // Группируем встречи по координатам (а не по тексту адреса) — так надёжнее:
+  // даже если название места или адрес чуть отличаются, но точка на карте та же самая
+  function groupByLocation(list) {
+    const map = new Map();
+    list.forEach((e) => {
+      const key = `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(e);
+    });
+    return Array.from(map.values());
+  }
+
+  function renderMarkers() {
+    const ymaps3 = ymaps3Ref.current;
+    const map = mapRef.current;
+    if (!ymaps3 || !map) return;
+
+    markersRef.current.forEach((marker) => {
+      try { map.removeChild(marker); } catch { /* уже могла быть убрана раньше */ }
+    });
+    markersRef.current = [];
+
+    const groups = groupByLocation(visibleEvents);
+
+    groups.forEach((group) => {
+      const first = group[0];
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width:36px; height:36px; border-radius:50% 50% 50% 0; transform:rotate(45deg);
+        background:#ff6b57; display:flex; align-items:center; justify-content:center;
+        box-shadow:0 6px 14px rgba(0,0,0,.4); cursor:pointer; font-size:16px; position:relative;
+      `;
+      const inner = document.createElement('span');
+      // Если на этой точке несколько встреч — показываем сразу цифру-количество вместо иконки темы
+      inner.textContent = group.length > 1 ? String(group.length) : catInfo(first.category).ic;
+      inner.style.cssText = 'transform:rotate(-45deg);' + (group.length > 1 ? 'font-weight:700; font-family:\'Unbounded\',sans-serif; font-size:15px; color:#1a0d09;' : '');
+      el.appendChild(inner);
+
+      el.onclick = () => {
+        if (group.length === 1) onOpenEvent(first.id);
+        else setGroupPopup(group);
+      };
+
+      const marker = new ymaps3.YMapMarker({ coordinates: [first.lon, first.lat] }, el);
+      map.addChild(marker);
+      markersRef.current.push(marker);
+    });
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
+      <div className="topbar">
+        <h2>Карта</h2>
+        <div className="city-pill" onClick={() => setShowCityList(true)}>📍 {city}</div>
+      </div>
+
+      <div className="map-filters">
+        <div className={'chip' + (!filterTopic ? ' active' : '')} onClick={() => setFilterTopic(null)}>Все</div>
+        {TOPICS.map((t) => (
+          <div key={t.id} className={'chip' + (filterTopic === t.id ? ' active' : '')} onClick={() => setFilterTopic(t.id)}>
+            {t.ic} {t.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="map-canvas" style={{ flex: 1 }}>
+        <div ref={mapContainerRef} className="map-live-frame" />
+      </div>
+
+      {groupPopup && (
+        <div
+          onClick={() => setGroupPopup(null)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 500, display: 'flex', alignItems: 'flex-end' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 10 }}>Встречи в этой точке ({groupPopup.length})</h3>
+            {groupPopup.map((e) => (
+              <div key={e.id} className="ticket" style={{ margin: '0 0 10px', cursor: 'pointer' }} onClick={() => { setGroupPopup(null); onOpenEvent(e.id); }}>
+                <div className="ticket-cat">{catInfo(e.category).ic} {catInfo(e.category).label}</div>
+                <h3>{e.title}</h3>
+                <div className="meta">
+                  <span>🕐 {formatEventDate(e.event_date)}, {formatEventTime(e.event_time)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Список городов — накладывается ПОВЕРХ карты, а не заменяет её в разметке.
+          Если сделать это отдельным return(), контейнер карты пересоздаётся при
+          возврате назад, и живая карта Яндекса ломается (именно это и происходило). */}
+      {showCityList && (
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+          <div className="topbar"><h2>Выбери город</h2></div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {CITIES.map((c) => (
+              <div
+                key={c}
+                className={'city-item' + (city === c ? ' active' : '')}
+                onClick={() => { onCityChange(c); setShowCityList(false); }}
+              >
+                <span>{c}</span>{city === c && <span>✓</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}  }, [city]);
+
+  async function loadEvents() {
+    const { data } = await supabase
+      .from('events')
+      .select('*')
+      .eq('is_online', false)
+      .eq('city', city)
+      .not('lat', 'is', null);
+    setEvents((data || []).filter((e) => !isEventPast(e)));
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    loadYmaps().then((ymaps3) => {
+      if (cancelled || !mapContainerRef.current || mapRef.current) return;
+      ymaps3Ref.current = ymaps3;
+      const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } = ymaps3;
+      const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
+
+      const map = new YMap(mapContainerRef.current, {
+        location: { center: [c.lon, c.lat], zoom: c.z },
+      });
+      map.addChild(new YMapDefaultSchemeLayer());
+      map.addChild(new YMapDefaultFeaturesLayer());
+
+      mapRef.current = map;
+      renderMarkers();
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    renderMarkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, filterTopic]);
+
+  const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
+
   // Группируем встречи, поставленные по одному и тому же адресу — на карте это одна точка со счётчиком
   function groupByAddress(list) {
     const map = new Map();
