@@ -28,10 +28,29 @@ export default function AppShell({ onSignOut }) {
   // Встречи организатора, где явку ещё нужно подтвердить — показываем сразу при входе,
   // до карты и вкладок, пока все такие встречи не разобраны одна за другой.
   const [pendingAttendanceIds, setPendingAttendanceIds] = useState(null); // null = ещё не проверяли
+  const [notifications, setNotifications] = useState([]); // уведомления об отклонении/отмене
 
   useEffect(() => {
     checkPendingAttendance();
+    checkNotifications();
   }, []);
+
+  async function checkNotifications() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from('user_notifications')
+      .select('id, message')
+      .eq('user_id', session.user.id)
+      .eq('seen', false)
+      .order('created_at', { ascending: true });
+    setNotifications(data || []);
+  }
+
+  async function dismissNotification(id) {
+    await supabase.from('user_notifications').update({ seen: true }).eq('id', id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
 
   async function checkPendingAttendance() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -80,72 +99,80 @@ export default function AppShell({ onSignOut }) {
   if (pendingAttendanceIds === null) {
     return <Loading />;
   }
-  if (pendingAttendanceIds.length > 0) {
-    return (
-      <div className="app-shell">
-        <AttendanceConfirm
-          eventId={pendingAttendanceIds[0]}
-          onDone={() => setPendingAttendanceIds((prev) => prev.slice(1))}
-        />
-      </div>
-    );
-  }
 
-  if (overlay?.type === 'gatherForm') {
-    return (
-      <div className="app-shell">
-        <GatherForm city={city} onBack={closeOverlay} onCreated={closeOverlay} />
-      </div>
+  let mainContent;
+  if (pendingAttendanceIds.length > 0) {
+    mainContent = (
+      <AttendanceConfirm
+        eventId={pendingAttendanceIds[0]}
+        onDone={() => setPendingAttendanceIds((prev) => prev.slice(1))}
+      />
     );
-  }
-  if (overlay?.type === 'eventDetail') {
-    return (
-      <div className="app-shell">
-        <EventDetail
-          eventId={overlay.eventId}
-          onBack={closeOverlay}
-          onOpenChat={(eventTitle) => openChat(overlay.eventId, eventTitle)}
-        />
-      </div>
+  } else if (overlay?.type === 'gatherForm') {
+    mainContent = <GatherForm city={city} onBack={closeOverlay} onCreated={closeOverlay} />;
+  } else if (overlay?.type === 'eventDetail') {
+    mainContent = (
+      <EventDetail
+        eventId={overlay.eventId}
+        onBack={closeOverlay}
+        onOpenChat={(eventTitle) => openChat(overlay.eventId, eventTitle)}
+      />
     );
-  }
-  if (overlay?.type === 'chat') {
-    return (
-      <div className="app-shell">
-        <Chat
-          eventId={overlay.eventId}
-          eventTitle={overlay.eventTitle}
-          onBack={() => setOverlay({ type: 'eventDetail', eventId: overlay.eventId })}
-        />
-      </div>
+  } else if (overlay?.type === 'chat') {
+    mainContent = (
+      <Chat
+        eventId={overlay.eventId}
+        eventTitle={overlay.eventTitle}
+        onBack={() => setOverlay({ type: 'eventDetail', eventId: overlay.eventId })}
+      />
+    );
+  } else {
+    mainContent = (
+      <>
+        <div className="tab-content">
+          {tab === 'map' && <MapTab key={refreshKey} city={city} onCityChange={setCity} onOpenEvent={openEvent} />}
+          {tab === 'events' && <EventsTab key={refreshKey} city={city} onOpenEvent={openEvent} />}
+          {tab === 'my' && <MyMeetingsTab key={refreshKey} onOpenEvent={openEvent} />}
+          {tab === 'profile' && <ProfileTab onSignOut={handleSignOut} />}
+        </div>
+        {tab !== 'profile' && (
+          <div style={{ padding: '0 16px 10px' }}>
+            <button className="btn btn-primary" onClick={() => setOverlay({ type: 'gatherForm' })}>🤝 Собрать встречу</button>
+          </div>
+        )}
+        <div className="tabbar">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={'tabbtn' + (tab === t.id ? ' active' : '')}
+              onClick={() => setTab(t.id)}
+            >
+              <div className="ic">{t.ic}</div>
+              <div>{t.label}</div>
+            </button>
+          ))}
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="app-shell">
-      <div className="tab-content">
-        {tab === 'map' && <MapTab key={refreshKey} city={city} onCityChange={setCity} onOpenEvent={openEvent} />}
-        {tab === 'events' && <EventsTab key={refreshKey} city={city} onOpenEvent={openEvent} />}
-        {tab === 'my' && <MyMeetingsTab key={refreshKey} onOpenEvent={openEvent} />}
-        {tab === 'profile' && <ProfileTab onSignOut={handleSignOut} />}
-      </div>
-      {tab !== 'profile' && (
-        <div style={{ padding: '0 16px 10px' }}>
-          <button className="btn btn-primary" onClick={() => setOverlay({ type: 'gatherForm' })}>🤝 Собрать встречу</button>
+    <div className="app-shell" style={{ position: 'relative' }}>
+      {mainContent}
+
+      {/* Уведомление об отклонении/отмене встречи — показываем поверх чего угодно,
+          но не блокируем работу с приложением, просто "Понятно" и дальше */}
+      {notifications.length > 0 && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--ink)', border: '1px solid var(--stroke)', borderRadius: 18, padding: 20, maxWidth: 320 }}>
+            <div style={{ fontSize: 28, marginBottom: 12, textAlign: 'center' }}>😔</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)', marginBottom: 18, textAlign: 'center' }}>
+              {notifications[0].message}
+            </p>
+            <button className="btn btn-primary" onClick={() => dismissNotification(notifications[0].id)}>Понятно</button>
+          </div>
         </div>
       )}
-      <div className="tabbar">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={'tabbtn' + (tab === t.id ? ' active' : '')}
-            onClick={() => setTab(t.id)}
-          >
-            <div className="ic">{t.ic}</div>
-            <div>{t.label}</div>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
