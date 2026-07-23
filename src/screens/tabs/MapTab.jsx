@@ -10,6 +10,7 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
   const [events, setEvents] = useState([]);
   const [filterTopic, setFilterTopic] = useState(null); // null = "Все"
   const [groupPopup, setGroupPopup] = useState(null); // список встреч на одном адресе, если их несколько
+  const [mapReady, setMapReady] = useState(false); // карта — асинхронно тяжёлый внешний скрипт, события из базы обычно приходят быстрее
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const ymaps3Ref = useRef(null);
@@ -62,6 +63,7 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
       map.addChild(new YMapDefaultFeaturesLayer());
 
       mapRef.current = map;
+      setMapReady(true);
       renderMarkers();
     });
     return () => { cancelled = true; };
@@ -71,7 +73,7 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
   useEffect(() => {
     renderMarkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, filterTopic]);
+  }, [events, filterTopic, mapReady]);
 
   const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
 
