@@ -1,221 +1,191 @@
-import React, { useState } from 'react';
-import { supabase } from '../supabaseClient.js';
-import { TOPICS, ONLINE_TAGS } from '../constants.js';
-import { geocodeAddress } from '../geocode.js';
+import React, { useEffect, useRef, useState } from 'react';
+import { supabase } from '../../supabaseClient.js';
+import { CITIES, CITY_COORDS, TOPICS, catInfo } from '../../constants.js';
+import { loadYmaps } from '../../loadYmaps.js';
+import { isEventPast } from '../../isEventPast.js';
+import TicketCard from '../../TicketCard.jsx';
 
-export default function GatherForm({ city, onBack, onCreated }) {
-  const [isOnline, setIsOnline] = useState(false); // офлайн по умолчанию
-  const [topic, setTopic] = useState('bars');
-  const [venue, setVenue] = useState('');
-  const [address, setAddress] = useState('');
-  const [venueLink, setVenueLink] = useState('');
-  const [onlineLink, setOnlineLink] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
-  const [description, setDescription] = useState('');
-  const [rules, setRules] = useState('');
-  const [limit, setLimit] = useState(4);
-  const [ageLimit, setAgeLimit] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+export default function MapTab({ city, onCityChange, onOpenEvent }) {
+  const [showCityList, setShowCityList] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [filterTopic, setFilterTopic] = useState(null); // null = "Все"
+  const [groupPopup, setGroupPopup] = useState(null); // список встреч на одном адресе, если их несколько
+  const [mapReady, setMapReady] = useState(false); // карта — асинхронно тяжёлый внешний скрипт, события из базы обычно приходят быстрее
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const ymaps3Ref = useRef(null);
+  const markersRef = useRef([]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const maxDateObj = new Date();
-  maxDateObj.setDate(maxDateObj.getDate() + 30);
-  const maxDateStr = maxDateObj.toISOString().slice(0, 10);
+  // Один общий эффект на смену города — раньше перемещение камеры (с анимацией)
+  // и перерисовка точек срабатывали двумя отдельными эффектами почти одновременно,
+  // и, судя по всему, конфликтовали друг с другом, из-за чего карта "чернела".
+  useEffect(() => {
+    // Сначала убираем старые точки, чтобы они не остались висеть поверх новой локации
+    if (mapRef.current) {
+      markersRef.current.forEach((marker) => {
+        try { mapRef.current.removeChild(marker); } catch { /* точка уже могла быть убрана */ }
+      });
+      markersRef.current = [];
 
-  const currentTopics = isOnline ? ONLINE_TAGS : TOPICS;
+      const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
+      try {
+        // Без анимации (duration) — резкий переход надёжнее на разных устройствах
+        mapRef.current.setLocation({ center: [c.lon, c.lat], zoom: c.z });
+      } catch { /* если карта в этот момент ещё не готова — просто пропускаем кадр */ }
+    }
+    loadEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
 
-  function handleToggle(next) {
-    setIsOnline(next);
-    setTopic(next ? ONLINE_TAGS[0].id : TOPICS[0].id);
+  async function loadEvents() {
+    const { data } = await supabase
+      .from('events')
+      .select('*, event_attendees(count)')
+      .eq('is_online', false)
+      .eq('city', city)
+      .not('lat', 'is', null);
+    const withCounts = (data || []).map((e) => ({ ...e, attendee_count: e.event_attendees?.[0]?.count ?? 0 }));
+    setEvents(withCounts.filter((e) => !isEventPast(e)));
   }
 
-  async function handleSubmit() {
-    if (isOnline) {
-      if (!onlineLink.trim() || !date || !time) {
-        setError('Заполни ссылку, дату и время');
-        return;
-      }
-    } else {
-      if (!venue.trim() || !address.trim() || !date || !time) {
-        setError('Заполни название локации, адрес, дату и время');
-        return;
-      }
-    }
+  useEffect(() => {
+    let cancelled = false;
+    loadYmaps().then((ymaps3) => {
+      if (cancelled || !mapContainerRef.current || mapRef.current) return;
+      ymaps3Ref.current = ymaps3;
+      const { YMap, YMapDefaultSchemeLayer, YMapDefaultFeaturesLayer } = ymaps3;
+      const c = CITY_COORDS[city] || CITY_COORDS['Москва'];
 
-    if (!date) {
-      setError('Выбери дату встречи');
-      return;
-    }
+      const map = new YMap(mapContainerRef.current, {
+        location: { center: [c.lon, c.lat], zoom: c.z },
+      });
+      map.addChild(new YMapDefaultSchemeLayer());
+      map.addChild(new YMapDefaultFeaturesLayer());
 
-    const chosenDateTime = new Date(`${date}T${time}`);
-    if (isNaN(chosenDateTime.getTime())) {
-      setError('Такой даты не существует — проверь, что ввёл(а) верно');
-      return;
-    }
-    const minAllowed = new Date(Date.now() + 60 * 60 * 1000);
-    const maxAllowed = new Date();
-    maxAllowed.setDate(maxAllowed.getDate() + 30);
-    if (chosenDateTime.getTime() < minAllowed.getTime()) {
-      setError('Встречу можно назначить не раньше, чем через час от текущего времени');
-      return;
-    }
-    if (chosenDateTime.getTime() > maxAllowed.getTime()) {
-      setError('Встречу можно назначить не позже, чем через 30 дней');
-      return;
-    }
-
-    setSaving(true);
-    setError('');
-
-    let coords = { lat: null, lon: null };
-    if (!isOnline) {
-      const fullAddress = `${city}, ${address.trim()}`;
-      coords = await geocodeAddress(fullAddress);
-      if (!coords) {
-        setError('Не получилось найти этот адрес на карте — проверь, что он указан верно');
-        setSaving(false);
-        return;
-      }
-    }
-
-    const { data: { session } } = await supabase.auth.getSession();
-
-    // Название карточки: для офлайн — это сама введённая локация ("Ресторан «Пушкин»"),
-    // для онлайн (там нет физического места) — берём тему
-    const title = isOnline
-      ? `${currentTopics.find((t) => t.id === topic)?.label}: встреча`
-      : venue.trim();
-
-    const { error: insertError } = await supabase.from('events').insert({
-      organizer_id: session.user.id,
-      title,
-      category: topic,
-      is_online: isOnline,
-      city: isOnline ? null : city,
-      venue_name: isOnline ? null : venue.trim(),
-      address: isOnline ? null : address.trim(),
-      venue_link: isOnline ? null : (venueLink.trim() || null),
-      online_link: isOnline ? onlineLink.trim() : null,
-      event_date: date,
-      event_time: time,
-      description: description.trim(),
-      rules: rules.trim() || null,
-      participant_limit: Math.min(30, Math.max(1, parseInt(limit, 10) || 1)),
-      age_restriction: ageLimit || null,
-      lat: isOnline ? null : coords.lat,
-      lon: isOnline ? null : coords.lon,
+      mapRef.current = map;
+      setMapReady(true);
+      renderMarkers();
     });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    setSaving(false);
-    if (insertError) {
-      setError('Не получилось создать встречу: ' + insertError.message);
-      return;
-    }
-    onCreated();
+  useEffect(() => {
+    renderMarkers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, filterTopic, mapReady]);
+
+  const visibleEvents = filterTopic ? events.filter((e) => e.category === filterTopic) : events;
+
+  // Группируем встречи, если совпадает адрес ИЛИ название карточки — без учёта
+  // регистра букв (раньше группировка зависела от координат геокодирования,
+  // которые могли чуть отличаться даже для одного и того же места)
+  function normalize(s) { return (s || '').trim().toLowerCase(); }
+
+  function groupByLocation(list) {
+    const groups = [];
+    list.forEach((e) => {
+      const addr = normalize(e.address);
+      const title = normalize(e.title);
+      const existing = groups.find((g) =>
+        g.some((other) => (addr && normalize(other.address) === addr) || (title && normalize(other.title) === title))
+      );
+      if (existing) existing.push(e);
+      else groups.push([e]);
+    });
+    return groups;
+  }
+
+  function renderMarkers() {
+    const ymaps3 = ymaps3Ref.current;
+    const map = mapRef.current;
+    if (!ymaps3 || !map) return;
+
+    markersRef.current.forEach((marker) => {
+      try { map.removeChild(marker); } catch { /* уже могла быть убрана раньше */ }
+    });
+    markersRef.current = [];
+
+    const groups = groupByLocation(visibleEvents);
+
+    groups.forEach((group) => {
+      const first = group[0];
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width:36px; height:36px; border-radius:50% 50% 50% 0; transform:rotate(45deg);
+        background:#ff6b57; display:flex; align-items:center; justify-content:center;
+        box-shadow:0 6px 14px rgba(0,0,0,.4); cursor:pointer; font-size:16px; position:relative;
+      `;
+      const inner = document.createElement('span');
+      // Если на этой точке несколько встреч — показываем сразу цифру-количество вместо иконки темы
+      inner.textContent = group.length > 1 ? String(group.length) : catInfo(first.category).ic;
+      inner.style.cssText = 'transform:rotate(-45deg);' + (group.length > 1 ? 'font-weight:700; font-family:\'Unbounded\',sans-serif; font-size:15px; color:#1a0d09;' : '');
+      el.appendChild(inner);
+
+      el.onclick = () => {
+        if (group.length === 1) onOpenEvent(first.id);
+        else setGroupPopup(group);
+      };
+
+      const marker = new ymaps3.YMapMarker({ coordinates: [first.lon, first.lat] }, el);
+      map.addChild(marker);
+      markersRef.current.push(marker);
+    });
   }
 
   return (
-    <div className="screen">
-      <div className="auth-wrap" style={{ padding: '16px 20px' }}>
-        <div className="backbtn" onClick={onBack}>←</div>
-        <h2 style={{ fontSize: 17, marginBottom: 16 }}>Собрать встречу</h2>
-
-        <label>Формат встречи</label>
-        <div className="chip-row" style={{ marginBottom: 14 }}>
-          <div className={'chip' + (!isOnline ? ' active' : '')} onClick={() => handleToggle(false)}>Офлайн</div>
-          <div className={'chip' + (isOnline ? ' active' : '')} onClick={() => handleToggle(true)}>Онлайн</div>
-        </div>
-
-        <label>Тема встречи</label>
-        <div className="chip-row" style={{ marginBottom: 14 }}>
-          {currentTopics.map((t) => (
-            <div
-              key={t.id}
-              className={'chip' + (topic === t.id ? ' active' : '')}
-              onClick={() => setTopic(t.id)}
-            >
-              {t.ic} {t.label}
-            </div>
-          ))}
-        </div>
-
-        {isOnline ? (
-          <div className="field">
-            <label>Ссылка на встречу</label>
-            <input value={onlineLink} onChange={(e) => setOnlineLink(e.target.value)} placeholder="Zoom, Discord и т.д." />
-          </div>
-        ) : (
-          <>
-            <div className="field">
-              <label>Название локации</label>
-              <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder='Например, ресторан «Пушкин»' />
-            </div>
-            <div className="field">
-              <label>Адрес</label>
-              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Улица, дом" />
-            </div>
-            <div className="field">
-              <label>Ссылка на заведение (необязательно)</label>
-              <input value={venueLink} onChange={(e) => setVenueLink(e.target.value)} placeholder="Сайт, ссылка на картах и т.д." />
-            </div>
-          </>
-        )}
-
-        <div className="field">
-          <label>Дата</label>
-          <input
-            type="date"
-            min={today}
-            max={maxDateStr}
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label>Время</label>
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>О встрече</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="О чём встреча?" />
-        </div>
-        <div className="field">
-          <label>Правила встречи (необязательно)</label>
-          <textarea value={rules} onChange={(e) => setRules(e.target.value)} placeholder="Дресс-код, что взять с собой и т.д." />
-        </div>
-        <div className="field">
-          <label>Лимит участников</label>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            onBlur={() => {
-              let n = parseInt(limit, 10);
-              if (isNaN(n) || n < 1) n = 1;
-              if (n > 30) n = 30;
-              setLimit(n);
-            }}
-          />
-        </div>
-        <div className="field">
-          <label>Возрастной ценз (если нужен)</label>
-          <select value={ageLimit} onChange={(e) => setAgeLimit(e.target.value)}>
-            <option value="">Нет</option>
-            <option value="18+">18+</option>
-            <option value="21+">21+</option>
-          </select>
-        </div>
-
-        {error && <div className="field-error" style={{ marginBottom: 12 }}>{error}</div>}
-
-        <button className="btn btn-primary" disabled={saving} onClick={handleSubmit}>
-          {saving ? 'Публикуем...' : 'Опубликовать встречу'}
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
+      <div className="topbar">
+        <h2>Карта</h2>
+        <div className="city-pill" onClick={() => setShowCityList(true)}>📍 {city}</div>
       </div>
+
+      <div className="map-filters">
+        <div className={'chip' + (!filterTopic ? ' active' : '')} onClick={() => setFilterTopic(null)}>Все</div>
+        {TOPICS.map((t) => (
+          <div key={t.id} className={'chip' + (filterTopic === t.id ? ' active' : '')} onClick={() => setFilterTopic(t.id)}>
+            {t.ic} {t.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="map-canvas" style={{ flex: 1 }}>
+        <div ref={mapContainerRef} className="map-live-frame" />
+      </div>
+
+      {groupPopup && (
+        <div
+          onClick={() => setGroupPopup(null)}
+          style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999998, display: 'flex', alignItems: 'flex-end' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 10 }}>Встречи в этой точке ({groupPopup.length})</h3>
+            {groupPopup.map((e) => (
+              <TicketCard key={e.id} event={e} onClick={() => { setGroupPopup(null); onOpenEvent(e.id); }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Список городов — накладывается ПОВЕРХ карты, а не заменяет её в разметке.
+          Если сделать это отдельным return(), контейнер карты пересоздаётся при
+          возврате назад, и живая карта Яндекса ломается (именно это и происходило). */}
+      {showCityList && (
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+          <div className="topbar"><h2>Выбери город</h2></div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {CITIES.map((c) => (
+              <div
+                key={c}
+                className={'city-item' + (city === c ? ' active' : '')}
+                onClick={() => { onCityChange(c); setShowCityList(false); }}
+              >
+                <span>{c}</span>{city === c && <span>✓</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
