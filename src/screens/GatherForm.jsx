@@ -10,7 +10,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [address, setAddress] = useState('');
   const [venueLink, setVenueLink] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
-  const [date, setDate] = useState('');
+  const [dateDisplay, setDateDisplay] = useState(''); // маска ДД.ММ.ГГГГ, как вводит пользователь
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   const [rules, setRules] = useState('');
@@ -19,10 +19,26 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const today = new Date().toISOString().slice(0, 10);
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 30);
-  const maxDateStr = maxDate.toISOString().slice(0, 10);
+  const todayObj = new Date();
+  const todayPlaceholder = `${String(todayObj.getDate()).padStart(2, '0')}.${String(todayObj.getMonth() + 1).padStart(2, '0')}.${todayObj.getFullYear()}`;
+
+  function maskDateInput(raw) {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
+    let out = digits.slice(0, 2);
+    if (digits.length > 2) out += '.' + digits.slice(2, 4);
+    if (digits.length > 4) out += '.' + digits.slice(4, 8);
+    return out;
+  }
+
+  // Из маски ДД.ММ.ГГГГ получаем ISO-дату (YYYY-MM-DD) для сохранения и проверок, если она введена полностью
+  function parseDateDisplay(display) {
+    const m = display.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if (!m) return null;
+    const [, d, mo, y] = m;
+    return `${y}-${mo}-${d}`;
+  }
+
+  const date = parseDateDisplay(dateDisplay);
 
   const currentTopics = isOnline ? ONLINE_TAGS : TOPICS;
 
@@ -44,10 +60,25 @@ export default function GatherForm({ city, onBack, onCreated }) {
       }
     }
 
+    if (!date) {
+      setError('Введи дату полностью в формате ДД.ММ.ГГГГ');
+      return;
+    }
+
     const chosenDateTime = new Date(`${date}T${time}`);
+    if (isNaN(chosenDateTime.getTime())) {
+      setError('Такой даты не существует — проверь, что ввёл(а) верно');
+      return;
+    }
     const minAllowed = new Date(Date.now() + 60 * 60 * 1000);
+    const maxAllowed = new Date();
+    maxAllowed.setDate(maxAllowed.getDate() + 30);
     if (chosenDateTime.getTime() < minAllowed.getTime()) {
       setError('Встречу можно назначить не раньше, чем через час от текущего времени');
+      return;
+    }
+    if (chosenDateTime.getTime() > maxAllowed.getTime()) {
+      setError('Встречу можно назначить не позже, чем через 30 дней');
       return;
     }
 
@@ -151,16 +182,11 @@ export default function GatherForm({ city, onBack, onCreated }) {
         <div className="field">
           <label>Дата</label>
           <input
-            type="date"
-            min={today}
-            max={maxDateStr}
-            value={date}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v && v < today) { setDate(today); return; }
-              if (v && v > maxDateStr) { setDate(maxDateStr); return; }
-              setDate(v);
-            }}
+            type="text"
+            inputMode="numeric"
+            value={dateDisplay}
+            onChange={(e) => setDateDisplay(maskDateInput(e.target.value))}
+            placeholder={`Например, ${todayPlaceholder}`}
           />
         </div>
         <div className="field">
