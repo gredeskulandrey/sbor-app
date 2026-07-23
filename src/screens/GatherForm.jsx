@@ -10,7 +10,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [address, setAddress] = useState('');
   const [venueLink, setVenueLink] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
-  const [dateDisplay, setDateDisplay] = useState(''); // маска ДД.ММ.ГГГГ, как вводит пользователь
+  const [dateDigits, setDateDigits] = useState(''); // сырые цифры даты (до 8), собираются в шаблон __.__.____
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
   const [rules, setRules] = useState('');
@@ -19,26 +19,33 @@ export default function GatherForm({ city, onBack, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const todayObj = new Date();
-  const todayPlaceholder = `${String(todayObj.getDate()).padStart(2, '0')}.${String(todayObj.getMonth() + 1).padStart(2, '0')}.${todayObj.getFullYear()}`;
+  const DATE_TEMPLATE = '__.__.____';
 
-  function maskDateInput(raw) {
-    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
-    let out = digits.slice(0, 2);
-    if (digits.length > 2) out += '.' + digits.slice(2, 4);
-    if (digits.length > 4) out += '.' + digits.slice(4, 8);
+  // Собирает шаблон "__.__.____" с уже введёнными цифрами вместо подчёркиваний —
+  // видно сразу, сколько ещё осталось ввести и в каком формате
+  function buildDateMask(digits) {
+    let out = '';
+    let di = 0;
+    for (const ch of DATE_TEMPLATE) {
+      if (ch === '_') { out += digits[di] !== undefined ? digits[di] : '_'; di++; }
+      else out += ch;
+    }
     return out;
   }
 
-  // Из маски ДД.ММ.ГГГГ получаем ISO-дату (YYYY-MM-DD) для сохранения и проверок, если она введена полностью
-  function parseDateDisplay(display) {
-    const m = display.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-    if (!m) return null;
-    const [, d, mo, y] = m;
+  function handleDateInput(raw) {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, 8);
+    setDateDigits(digits);
+  }
+
+  // Из введённых цифр (ДДММГГГГ) получаем ISO-дату (YYYY-MM-DD), только если введены все 8
+  function parseDateDigits(digits) {
+    if (digits.length !== 8) return null;
+    const d = digits.slice(0, 2), mo = digits.slice(2, 4), y = digits.slice(4, 8);
     return `${y}-${mo}-${d}`;
   }
 
-  const date = parseDateDisplay(dateDisplay);
+  const date = parseDateDigits(dateDigits);
 
   const currentTopics = isOnline ? ONLINE_TAGS : TOPICS;
 
@@ -87,7 +94,7 @@ export default function GatherForm({ city, onBack, onCreated }) {
 
     let coords = { lat: null, lon: null };
     if (!isOnline) {
-      const fullAddress = `${city}, ${venue.trim()}, ${address.trim()}`;
+      const fullAddress = `${city}, ${address.trim()}`;
       coords = await geocodeAddress(fullAddress);
       if (!coords) {
         setError('Не получилось найти этот адрес на карте — проверь, что он указан верно');
@@ -184,9 +191,9 @@ export default function GatherForm({ city, onBack, onCreated }) {
           <input
             type="text"
             inputMode="numeric"
-            value={dateDisplay}
-            onChange={(e) => setDateDisplay(maskDateInput(e.target.value))}
-            placeholder={`Например, ${todayPlaceholder}`}
+            value={buildDateMask(dateDigits)}
+            onChange={(e) => handleDateInput(e.target.value)}
+            onFocus={(e) => e.target.setSelectionRange(0, 0)}
           />
         </div>
         <div className="field">
