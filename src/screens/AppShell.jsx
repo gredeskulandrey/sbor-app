@@ -93,6 +93,7 @@ export default function AppShell({ onSignOut }) {
   function closeOverlay() {
     setOverlay(null);
     setRefreshKey((k) => k + 1); // чтобы списки обновились (новая встреча / новый статус участия)
+    checkNotifications();
   }
 
   // Пока не проверили или пока остались неподтверждённые явки — это первый экран, без исключений
