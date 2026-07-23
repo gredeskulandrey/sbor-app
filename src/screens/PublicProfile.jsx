@@ -5,6 +5,7 @@ import { computeAchievements } from '../computeAchievements.js';
 import { getPrimaryPhoto } from '../getPrimaryPhoto.js';
 import Avatar from '../Avatar.jsx';
 import Loading from '../Loading.jsx';
+import { pluralizeYears } from '../pluralize.js';
 
 function calcAge(birthDateStr) {
   if (!birthDateStr) return null;
@@ -62,7 +63,7 @@ export default function PublicProfile({ profileId, onBack }) {
   if (!profile) return <div className="center-msg">Профиль не найден</div>;
 
   const age = calcAge(profile.birth_date);
-  const ageLabel = profile.show_only_year ? new Date(profile.birth_date).getFullYear() : `${age} лет`;
+  const ageLabel = profile.show_only_year ? new Date(profile.birth_date).getFullYear() : `${age} ${pluralizeYears(age)}`;
 
   const sortedAchievements = [...ACHIEVEMENTS].sort((a, b) => {
     const aUnlocked = unlockedIds.has(a.id) ? 0 : 1;
