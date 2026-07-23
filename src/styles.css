@@ -116,3 +116,12 @@ textarea{resize:none; min-height:80px;}
 .switch.on{background:var(--coral); border-color:var(--coral);}
 .switch.on .dot{background:#1a0d09; left:21px;}
 .settings-row{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #22263a; cursor:pointer;}
+.onboarding-progress{display:flex; gap:5px;}
+.onboarding-seg{flex:1; height:3px; border-radius:2px; background:var(--stroke);}
+.onboarding-seg.filled{background:var(--coral);}
+.onboarding-body{flex:1; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 24px;}
+.onboarding-ic{font-size:64px;}
+.onboarding-tap-zone{position:absolute; top:0; bottom:0; width:35%; cursor:pointer;}
+.onboarding-tap-zone.left{left:0;}
+.onboarding-tap-zone.right{right:0;}
+.map-filters .chip{font-size:11.5px; padding:7px 11px; white-space:nowrap; gap:4px;}
