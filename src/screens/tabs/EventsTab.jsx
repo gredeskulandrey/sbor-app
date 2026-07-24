@@ -19,10 +19,18 @@ export default function EventsTab({ city, onOpenEvent }) {
 
   async function loadEvents() {
     setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data: rejections } = session
+      ? await supabase.from('event_rejections').select('event_id').eq('user_id', session.user.id)
+      : { data: [] };
+    const rejectedIds = new Set((rejections || []).map((r) => r.event_id));
+
     let query = supabase.from('events').select('*, event_attendees(count)').eq('is_online', mode === 'online');
     if (mode === 'offline') query = query.eq('city', city);
     const { data } = await query;
-    const withCounts = (data || []).map((e) => ({ ...e, attendee_count: e.event_attendees?.[0]?.count ?? 0 }));
+    const withCounts = (data || [])
+      .filter((e) => !rejectedIds.has(e.id))
+      .map((e) => ({ ...e, attendee_count: e.event_attendees?.[0]?.count ?? 0 }));
     // Прошедшие встречи не показываем в общем списке — им тут больше не место
     setEvents(withCounts.filter((e) => !isEventPast(e)));
     setLoading(false);
