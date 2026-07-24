@@ -54,7 +54,7 @@ export default function GuestAttendanceConfirm({ event, onDone }) {
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div className="modal-fade" style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: 'var(--ink)', border: '1px solid var(--stroke)', borderRadius: 18, padding: 20, maxWidth: 320 }}>
         <h3 style={{ fontSize: 17, marginBottom: 10 }}>Встреча состоялась?</h3>
         <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 18 }}>
