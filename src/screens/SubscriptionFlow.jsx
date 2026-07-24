@@ -161,7 +161,11 @@ export default function SubscriptionFlow({ profile, onBack, onSubscriptionUpdate
               </div>
               <div className="field">
                 <label>Держатель карты</label>
-                <input value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="IVAN IVANOV" />
+                <input
+                  value={holder}
+                  onChange={(e) => setHolder(e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase())}
+                  placeholder="IVAN IVANOV"
+                />
               </div>
             </>
           )}
