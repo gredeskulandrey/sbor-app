@@ -28,6 +28,24 @@ export default function ReportUser({ reportedUserId, onBack }) {
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
 
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const { data: recent } = await supabase
+      .from('user_reports')
+      .select('created_at')
+      .eq('reporter_id', session.user.id)
+      .eq('reported_user_id', reportedUserId)
+      .gte('created_at', sixMonthsAgo.toISOString())
+      .order('created_at', { ascending: false })
+      .maybeSingle();
+    if (recent) {
+      const nextAllowed = new Date(recent.created_at);
+      nextAllowed.setMonth(nextAllowed.getMonth() + 6);
+      setSubmitting(false);
+      setError(`Ты уже жаловался(-ась) на этого пользователя недавно — повторно можно будет с ${nextAllowed.toLocaleDateString('ru-RU')}.`);
+      return;
+    }
+
     const { error: insertError } = await supabase.from('user_reports').insert({
       reporter_id: session.user.id,
       reported_user_id: reportedUserId,
