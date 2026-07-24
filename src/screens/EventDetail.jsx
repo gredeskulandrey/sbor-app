@@ -84,8 +84,11 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
     await supabase.from('user_notifications').insert({
       user_id: guest.user_id,
       event_id: eventId,
-      message: `Организатор отклонил тебя как гостя на встрече «${event.title}». Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
+      message: `К сожалению, тебя отклонили как гостя на встрече «${event.title}». Не переживай — самое время найти другое событие поблизости или собрать своё!`,
     });
+    // Запоминаем отказ — чтобы эта встреча больше не показывалась этому гостю
+    // ни на карте, ни в общем списке событий
+    await supabase.from('event_rejections').insert({ event_id: eventId, user_id: guest.user_id });
     await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', guest.user_id);
     await load();
     setBusy(false);
@@ -108,7 +111,7 @@ export default function EventDetail({ eventId, onBack, onOpenChat }) {
       await supabase.from('user_notifications').insert({
         user_id: a.user_id,
         event_id: eventId,
-        message: `Встреча «${event.title}», на которую ты записался(-ась), была отменена организатором. Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
+        message: `К сожалению, встреча «${event.title}», на которую ты записался(-ась), была отменена организатором. Самое время найти другое событие поблизости или собрать своё!`,
       });
     }
     await supabase.from('events').delete().eq('id', eventId);
