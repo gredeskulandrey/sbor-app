@@ -250,12 +250,14 @@ function SupportView({ onBack }) {
         <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 14 }}>
           Если что-то не работает или есть вопрос — напиши нам, ответим как можно скорее.
         </p>
-        <div style={{ background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, padding: 14, marginBottom: 10 }}>
-          Telegram: <b>@sbor_help</b>
-        </div>
-        <div style={{ background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, padding: 14 }}>
-          Сайт: <b>sbor.app/help</b>
-        </div>
+        <a
+          href="https://t.me/sborapp_support_bot"
+          target="_blank"
+          rel="noreferrer"
+          style={{ display: 'block', background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, padding: 14, color: 'var(--text)', textDecoration: 'none' }}
+        >
+          Telegram: <b style={{ color: 'var(--coral)' }}>@sborapp_support_bot</b>
+        </a>
       </div>
     </div>
   );
