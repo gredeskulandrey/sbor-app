@@ -128,6 +128,16 @@ export default function ProfileTab({ onSignOut }) {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 19 }}>{profile.first_name} {profile.last_name || ''}</h2>
+            <div
+              onClick={() => setShowPaywall(true)}
+              style={{
+                fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 8, cursor: 'pointer',
+                background: profile.subscription_tier === 'base' ? 'var(--card-2)' : 'var(--coral)',
+                color: profile.subscription_tier === 'base' ? 'var(--text-dim)' : '#1a0d09',
+              }}
+            >
+              {profile.subscription_tier === 'base' ? 'Base' : profile.subscription_tier === 'pro' ? 'Pro' : 'Ultimate'}
+            </div>
             <div onClick={() => setShowSettings(true)} style={{ marginLeft: 'auto', fontSize: 18, cursor: 'pointer' }}>🔧</div>
           </div>
           {age !== null && <p style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{ageLabel}</p>}
