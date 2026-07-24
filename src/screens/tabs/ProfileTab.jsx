@@ -4,7 +4,6 @@ import { catInfo, ACHIEVEMENTS } from '../../constants.js';
 import { formatPhoneDisplay } from '../../formatPhoneDisplay.js';
 import { computeAchievements } from '../../computeAchievements.js';
 import SettingsScreen from '../SettingsScreen.jsx';
-import SubscriptionFlow from '../SubscriptionFlow.jsx';
 import Avatar from '../../Avatar.jsx';
 import { getPrimaryPhoto } from '../../getPrimaryPhoto.js';
 import Loading from '../../Loading.jsx';
@@ -25,7 +24,7 @@ export default function ProfileTab({ onSignOut }) {
   const [identifier, setIdentifier] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
+  const [showSubscriptionBlockedModal, setShowSubscriptionBlockedModal] = useState(false);
   const [achvExpanded, setAchvExpanded] = useState(false);
 
   const [guestCount, setGuestCount] = useState(0);
@@ -97,16 +96,6 @@ export default function ProfileTab({ onSignOut }) {
     );
   }
 
-  if (showPaywall) {
-    return (
-      <SubscriptionFlow
-        profile={profile}
-        onBack={() => { setShowPaywall(false); loadEverything(); }}
-        onSubscriptionUpdated={(tier, expiresAt) => setProfile((p) => ({ ...p, subscription_tier: tier, subscription_expires_at: expiresAt }))}
-      />
-    );
-  }
-
   const age = calcAge(profile.birth_date);
   const ageLabel = profile.show_only_year
     ? new Date(profile.birth_date).getFullYear()
@@ -129,10 +118,10 @@ export default function ProfileTab({ onSignOut }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h2 style={{ fontSize: 19 }}>{profile.first_name} {profile.last_name || ''}</h2>
             <div
-              onClick={() => setShowPaywall(true)}
+              onClick={() => setShowSubscriptionBlockedModal(true)}
               style={{
                 fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 8, cursor: 'pointer',
-                background: profile.subscription_tier === 'base' ? 'var(--card-2)' : 'var(--coral)',
+                background: profile.subscription_tier === 'base' ? 'var(--card-2)' : profile.subscription_tier === 'proyear' ? 'var(--gold)' : 'var(--coral)',
                 color: profile.subscription_tier === 'base' ? 'var(--text-dim)' : '#1a0d09',
               }}
             >
@@ -205,7 +194,7 @@ export default function ProfileTab({ onSignOut }) {
           </div>
         </div>
 
-        <div className="settings-row" onClick={() => setShowPaywall(true)}>
+        <div className="settings-row" onClick={() => setShowSubscriptionBlockedModal(true)}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>Подписка</div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
@@ -220,6 +209,18 @@ export default function ProfileTab({ onSignOut }) {
           <div style={{ color: '#ff8b7d' }}>Выйти из аккаунта</div>
         </div>
       </div>
+
+      {showSubscriptionBlockedModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--ink)', border: '1px solid var(--stroke)', borderRadius: 18, padding: 20, maxWidth: 320 }}>
+            <div style={{ fontSize: 28, marginBottom: 12, textAlign: 'center' }}>🚧</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)', marginBottom: 18, textAlign: 'center' }}>
+              Подписка сейчас в разработке — весь функционал приложения полностью бесплатный.
+            </p>
+            <button className="btn btn-primary" onClick={() => setShowSubscriptionBlockedModal(false)}>Понятно</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
