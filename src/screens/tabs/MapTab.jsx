@@ -38,13 +38,21 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
   }, [city]);
 
   async function loadEvents() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data: rejections } = session
+      ? await supabase.from('event_rejections').select('event_id').eq('user_id', session.user.id)
+      : { data: [] };
+    const rejectedIds = new Set((rejections || []).map((r) => r.event_id));
+
     const { data } = await supabase
       .from('events')
       .select('*, event_attendees(count)')
       .eq('is_online', false)
       .eq('city', city)
       .not('lat', 'is', null);
-    const withCounts = (data || []).map((e) => ({ ...e, attendee_count: e.event_attendees?.[0]?.count ?? 0 }));
+    const withCounts = (data || [])
+      .filter((e) => !rejectedIds.has(e.id))
+      .map((e) => ({ ...e, attendee_count: e.event_attendees?.[0]?.count ?? 0 }));
     setEvents(withCounts.filter((e) => !isEventPast(e)));
   }
 
