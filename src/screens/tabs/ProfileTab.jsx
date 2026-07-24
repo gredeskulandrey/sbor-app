@@ -9,6 +9,17 @@ import { getPrimaryPhoto } from '../../getPrimaryPhoto.js';
 import Loading from '../../Loading.jsx';
 import { pluralizeYears } from '../../pluralize.js';
 
+// Записывает в базу только те достижения, которых там ещё нет — чтобы у каждого
+// была настоящая строка в таблице с датой, когда оно было получено впервые
+async function syncAchievementsToDb(userId, unlockedIds) {
+  if (unlockedIds.size === 0) return;
+  const { data: existing } = await supabase.from('user_achievements').select('achievement_id').eq('user_id', userId);
+  const alreadyStored = new Set((existing || []).map((r) => r.achievement_id));
+  const toInsert = [...unlockedIds].filter((id) => !alreadyStored.has(id));
+  if (toInsert.length === 0) return;
+  await supabase.from('user_achievements').insert(toInsert.map((achievement_id) => ({ user_id: userId, achievement_id })));
+}
+
 function calcAge(birthDateStr) {
   if (!birthDateStr) return null;
   const today = new Date();
@@ -69,7 +80,9 @@ export default function ProfileTab({ onSignOut }) {
     const rate = agreedRows.length === 0 ? 100 : Math.round((agreedRows.filter((r) => r.attended).length / agreedRows.length) * 100);
     setAttendanceRate(rate);
 
-    setUnlockedIds(computeAchievements({ meetings: list, attendanceRatePercent: rate, createdAt: prof?.created_at }));
+    const unlocked = computeAchievements({ meetings: list, attendanceRatePercent: rate, createdAt: prof?.created_at });
+    setUnlockedIds(unlocked);
+    await syncAchievementsToDb(user.id, unlocked);
 
     setLoading(false);
   }
