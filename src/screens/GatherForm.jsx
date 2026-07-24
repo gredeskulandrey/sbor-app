@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient.js';
-import { TOPICS, ONLINE_TAGS, CITY_COORDS } from '../constants.js';
+import { TOPICS, ONLINE_TAGS } from '../constants.js';
 import { geocodeAddress } from '../geocode.js';
-import { suggestAddress } from '../suggestAddress.js';
 
 export default function GatherForm({ city, onBack, onCreated }) {
   const [isOnline, setIsOnline] = useState(false); // офлайн по умолчанию
   const [topic, setTopic] = useState('bars');
   const [venue, setVenue] = useState('');
   const [address, setAddress] = useState('');
-  const [addressSuggestions, setAddressSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestTimer = React.useRef(null);
   const [venueLink, setVenueLink] = useState('');
   const [onlineLink, setOnlineLink] = useState('');
   const [date, setDate] = useState('');
@@ -33,22 +29,6 @@ export default function GatherForm({ city, onBack, onCreated }) {
   function handleToggle(next) {
     setIsOnline(next);
     setTopic(next ? ONLINE_TAGS[0].id : TOPICS[0].id);
-  }
-
-  function handleAddressChange(value) {
-    setAddress(value);
-    setShowSuggestions(true);
-    if (suggestTimer.current) clearTimeout(suggestTimer.current);
-    suggestTimer.current = setTimeout(async () => {
-      const results = await suggestAddress(value, city, CITY_COORDS[city]);
-      setAddressSuggestions(results);
-    }, 300);
-  }
-
-  function pickSuggestion(s) {
-    setAddress(s.subtitle ? `${s.text}, ${s.subtitle}` : s.text);
-    setAddressSuggestions([]);
-    setShowSuggestions(false);
   }
 
   async function handleSubmit() {
@@ -172,34 +152,9 @@ export default function GatherForm({ city, onBack, onCreated }) {
               <label>Название локации</label>
               <input value={venue} onChange={(e) => setVenue(e.target.value)} placeholder='Например, ресторан «Пушкин»' />
             </div>
-            <div className="field" style={{ position: 'relative' }}>
+            <div className="field">
               <label>Адрес</label>
-              <input
-                value={address}
-                onChange={(e) => handleAddressChange(e.target.value)}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Начни вводить улицу — покажем подсказки"
-                autoComplete="off"
-              />
-              {showSuggestions && addressSuggestions.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                  background: 'var(--card-2)', border: '1px solid var(--stroke)', borderRadius: 12,
-                  marginTop: 4, overflow: 'hidden',
-                }}>
-                  {addressSuggestions.map((s, i) => (
-                    <div
-                      key={i}
-                      onMouseDown={() => pickSuggestion(s)}
-                      style={{ padding: '10px 12px', fontSize: 13, cursor: 'pointer', borderBottom: i < addressSuggestions.length - 1 ? '1px solid var(--stroke)' : 'none' }}
-                    >
-                      <div>{s.text}</div>
-                      {s.subtitle && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.subtitle}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Улица, дом" />
             </div>
             <div className="field">
               <label>Ссылка на заведение (необязательно)</label>
