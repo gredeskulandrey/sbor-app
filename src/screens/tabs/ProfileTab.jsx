@@ -230,7 +230,7 @@ export default function ProfileTab({ onSignOut }) {
       </div>
 
       {showSubscriptionBlockedModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <div className="modal-fade" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div style={{ background: 'var(--ink)', border: '1px solid var(--stroke)', borderRadius: 18, padding: 20, maxWidth: 320 }}>
             <div style={{ fontSize: 28, marginBottom: 12, textAlign: 'center' }}>🚧</div>
             <p style={{ fontSize: 13.5, lineHeight: 1.6, color: 'var(--text-dim)', marginBottom: 18, textAlign: 'center' }}>
