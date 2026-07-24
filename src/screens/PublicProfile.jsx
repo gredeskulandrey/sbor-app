@@ -6,6 +6,7 @@ import { getPrimaryPhoto } from '../getPrimaryPhoto.js';
 import Avatar from '../Avatar.jsx';
 import Loading from '../Loading.jsx';
 import { pluralizeYears } from '../pluralize.js';
+import ReportUser from './ReportUser.jsx';
 
 function calcAge(birthDateStr) {
   if (!birthDateStr) return null;
@@ -22,6 +23,7 @@ export default function PublicProfile({ profileId, onBack }) {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [achvExpanded, setAchvExpanded] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const [guestCount, setGuestCount] = useState(0);
   const [organizerCount, setOrganizerCount] = useState(0);
@@ -62,6 +64,10 @@ export default function PublicProfile({ profileId, onBack }) {
   if (loading) return <Loading text="Загрузка профиля..." />;
   if (!profile) return <div className="center-msg">Профиль не найден</div>;
 
+  if (showReport) {
+    return <ReportUser reportedUserId={profile.id} onBack={() => setShowReport(false)} />;
+  }
+
   const age = calcAge(profile.birth_date);
   const ageLabel = profile.show_only_year ? new Date(profile.birth_date).getFullYear() : `${age} ${pluralizeYears(age)}`;
 
@@ -74,8 +80,11 @@ export default function PublicProfile({ profileId, onBack }) {
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 20px' }}>
+      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="backbtn" onClick={onBack}>←</div>
+        <div onClick={() => setShowReport(true)} style={{ fontSize: 20, cursor: 'pointer', color: '#ff8b7d' }} title="Пожаловаться на пользователя">
+          ⚠️
+        </div>
       </div>
 
       <div className="profile-hero" style={{ paddingTop: 0 }}>
