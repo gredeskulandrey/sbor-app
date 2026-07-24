@@ -82,6 +82,12 @@ export default function ProfileTab({ onSignOut }) {
     await onSignOut();
   }
 
+  function handleSignOutClick() {
+    if (window.confirm('Вы точно хотите выйти из аккаунта?')) {
+      handleSignOut();
+    }
+  }
+
   if (loading) return <Loading text="Загрузка профиля..." />;
   if (!profile) return <div className="center-msg">Не получилось загрузить профиль</div>;
 
@@ -205,7 +211,7 @@ export default function ProfileTab({ onSignOut }) {
           <div style={{ color: 'var(--text-faint)' }}>›</div>
         </div>
 
-        <div className="settings-row" style={{ borderBottom: 'none' }} onClick={handleSignOut}>
+        <div className="settings-row" style={{ borderBottom: 'none' }} onClick={handleSignOutClick}>
           <div style={{ color: '#ff8b7d' }}>Выйти из аккаунта</div>
         </div>
       </div>
