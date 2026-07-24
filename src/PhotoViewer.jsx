@@ -31,6 +31,7 @@ export default function PhotoViewer({ profileId, onClose }) {
   return (
     <div
       onClick={onClose}
+      className="modal-fade"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,.92)', zIndex: 999999,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column',
