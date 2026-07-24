@@ -164,6 +164,7 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
       {groupPopup && (
         <div
           onClick={() => setGroupPopup(null)}
+          className="modal-fade"
           style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', zIndex: 999998, display: 'flex', alignItems: 'flex-end' }}
         >
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--ink)', width: '100%', borderRadius: '20px 20px 0 0', padding: '16px 16px 24px', maxHeight: '70%', overflowY: 'auto' }}>
@@ -179,7 +180,7 @@ export default function MapTab({ city, onCityChange, onOpenEvent }) {
           Если сделать это отдельным return(), контейнер карты пересоздаётся при
           возврате назад, и живая карта Яндекса ломается (именно это и происходило). */}
       {showCityList && (
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-fade" style={{ position: 'absolute', inset: 0, background: 'var(--ink)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
           <div className="topbar"><h2>Выбери город</h2></div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {CITIES.map((c) => (
