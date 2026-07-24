@@ -97,8 +97,12 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
         <div style={{ fontSize: 14 }}>Нормативные документы</div>
         <div style={{ color: 'var(--text-faint)' }}>›</div>
       </div>
-      <div className="settings-row" onClick={() => setView('deleteReasons')} style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 14, color: '#ff8b7d' }}>Удалить аккаунт</div>
+      <div
+        className="settings-row"
+        onClick={() => setView('deleteReasons')}
+        style={{ border: '1px solid #5a2b28', borderRadius: 12, margin: '16px 20px 0' }}
+      >
+        <div style={{ fontSize: 14, color: '#ff8b7d', fontWeight: 600 }}>Удалить аккаунт</div>
       </div>
       <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-faint)', padding: '30px 0' }}>
         СБОР · версия 1.0.0
