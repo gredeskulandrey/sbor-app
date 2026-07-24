@@ -28,6 +28,18 @@ export default function ReportEvent({ eventId, onBack }) {
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
 
+    const { data: existing } = await supabase
+      .from('event_reports')
+      .select('id')
+      .eq('reporter_id', session.user.id)
+      .eq('event_id', eventId)
+      .maybeSingle();
+    if (existing) {
+      setSubmitting(false);
+      setError('Ты уже отправлял(а) жалобу на эту встречу — повторно отправить нельзя.');
+      return;
+    }
+
     const { error: insertError } = await supabase.from('event_reports').insert({
       reporter_id: session.user.id,
       event_id: eventId,
