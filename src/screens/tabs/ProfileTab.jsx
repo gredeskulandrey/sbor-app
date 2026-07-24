@@ -4,6 +4,7 @@ import { catInfo, ACHIEVEMENTS } from '../../constants.js';
 import { formatPhoneDisplay } from '../../formatPhoneDisplay.js';
 import { computeAchievements } from '../../computeAchievements.js';
 import SettingsScreen from '../SettingsScreen.jsx';
+import SubscriptionFlow from '../SubscriptionFlow.jsx';
 import Avatar from '../../Avatar.jsx';
 import { getPrimaryPhoto } from '../../getPrimaryPhoto.js';
 import Loading from '../../Loading.jsx';
@@ -24,6 +25,7 @@ export default function ProfileTab({ onSignOut }) {
   const [identifier, setIdentifier] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [achvExpanded, setAchvExpanded] = useState(false);
 
   const [guestCount, setGuestCount] = useState(0);
@@ -91,6 +93,16 @@ export default function ProfileTab({ onSignOut }) {
         onBack={() => { setShowSettings(false); loadEverything(); }}
         onProfileUpdated={handleProfileUpdated}
         onAccountDeleted={handleSignOut}
+      />
+    );
+  }
+
+  if (showPaywall) {
+    return (
+      <SubscriptionFlow
+        profile={profile}
+        onBack={() => { setShowPaywall(false); loadEverything(); }}
+        onSubscriptionUpdated={(tier, expiresAt) => setProfile((p) => ({ ...p, subscription_tier: tier, subscription_expires_at: expiresAt }))}
       />
     );
   }
@@ -183,13 +195,15 @@ export default function ProfileTab({ onSignOut }) {
           </div>
         </div>
 
-        <div className="settings-row">
+        <div className="settings-row" onClick={() => setShowPaywall(true)}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 500 }}>Подписка</div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
               {profile.subscription_tier === 'base' ? 'Base' : profile.subscription_tier === 'pro' ? 'Pro' : 'Ultimate'}
+              {profile.subscription_expires_at && ` · до ${new Date(profile.subscription_expires_at).toLocaleDateString('ru-RU')}`}
             </div>
           </div>
+          <div style={{ color: 'var(--text-faint)' }}>›</div>
         </div>
 
         <div className="settings-row" style={{ borderBottom: 'none' }} onClick={handleSignOut}>
