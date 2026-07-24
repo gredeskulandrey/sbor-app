@@ -41,7 +41,6 @@ const FAQ = [
 
   // Настройки и аккаунт
   { q: 'Как включить или выключить уведомления?', a: 'В настройках (⚙️) — раздел «Уведомления», один переключатель.' },
-  { q: 'Как сменить язык приложения?', a: 'В настройках (⚙️) — раздел «Язык»: русский или английский.' },
   { q: 'Как удалить свой аккаунт?', a: 'В настройках, в самом низу списка — пункт «Удалить аккаунт». Попросим указать причину, а затем действие будет выполнено безвозвратно — все данные, включая встречи и статистику, удаляются полностью.' },
 ];
 
@@ -51,7 +50,6 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
 
   if (view === 'editProfile') return <EditProfileView profile={profile} onBack={() => setView('main')} onSaved={onProfileUpdated} />;
   if (view === 'notifications') return <NotificationsView profile={profile} onBack={() => setView('main')} onProfileUpdated={onProfileUpdated} />;
-  if (view === 'language') return <LanguageView profile={profile} onBack={() => setView('main')} onProfileUpdated={onProfileUpdated} />;
   if (view === 'faq') return <FaqView onBack={() => setView('main')} />;
   if (view === 'support') return <SupportView onBack={() => setView('main')} />;
   if (view === 'legal') return <LegalView onBack={() => setView('main')} />;
@@ -85,10 +83,6 @@ export default function SettingsScreen({ profile, onBack, onProfileUpdated, onAc
       </div>
       <div className="settings-row" onClick={() => setView('notifications')}>
         <div style={{ fontSize: 14 }}>Уведомления</div>
-        <div style={{ color: 'var(--text-faint)' }}>›</div>
-      </div>
-      <div className="settings-row" onClick={() => setView('language')}>
-        <div style={{ fontSize: 14 }}>Язык</div>
         <div style={{ color: 'var(--text-faint)' }}>›</div>
       </div>
       <div className="settings-row" onClick={() => setView('faq')}>
@@ -225,31 +219,6 @@ function NotificationsView({ profile, onBack, onProfileUpdated }) {
       <div className="settings-row">
         <div style={{ fontSize: 14 }}>Push-уведомления</div>
         <div className={'switch' + (enabled ? ' on' : '')} onClick={toggle}><div className="dot" /></div>
-      </div>
-    </div>
-  );
-}
-
-function LanguageView({ profile, onBack, onProfileUpdated }) {
-  const [lang, setLang] = useState(profile.language || 'ru');
-
-  async function pick(value) {
-    setLang(value);
-    await supabase.from('profiles').update({ language: value }).eq('id', profile.id);
-    onProfileUpdated({ ...profile, language: value });
-  }
-
-  return (
-    <div className="screen" style={{ overflowY: 'auto' }}>
-      <div style={{ padding: '16px 20px' }}>
-        <div className="backbtn" onClick={onBack}>←</div>
-        <h2 style={{ fontSize: 17, marginBottom: 16 }}>Язык</h2>
-      </div>
-      <div className={'city-item' + (lang === 'ru' ? ' active' : '')} onClick={() => pick('ru')}>
-        <span>Русский</span>{lang === 'ru' && <span>✓</span>}
-      </div>
-      <div className={'city-item' + (lang === 'en' ? ' active' : '')} onClick={() => pick('en')}>
-        <span>English</span>{lang === 'en' && <span>✓</span>}
       </div>
     </div>
   );
