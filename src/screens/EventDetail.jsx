@@ -1,225 +1,160 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient.js';
-import { catInfo } from '../constants.js';
-import { isEventPast } from '../isEventPast.js';
-import { formatEventDate, formatEventTime } from '../formatDateTime.js';
+import { catInfo, ACHIEVEMENTS } from '../constants.js';
+import { computeAchievements } from '../computeAchievements.js';
+import { getPrimaryPhoto } from '../getPrimaryPhoto.js';
 import Avatar from '../Avatar.jsx';
 import Loading from '../Loading.jsx';
-import PublicProfile from './PublicProfile.jsx';
+import { pluralizeYears } from '../pluralize.js';
+import ReportUser from './ReportUser.jsx';
 
-export default function EventDetail({ eventId, onBack, onOpenChat }) {
-  const [event, setEvent] = useState(null);
-  const [organizer, setOrganizer] = useState(null);
-  const [attendees, setAttendees] = useState([]);
-  const [myUserId, setMyUserId] = useState(null);
+function calcAge(birthDateStr) {
+  if (!birthDateStr) return null;
+  const today = new Date();
+  const bd = new Date(birthDateStr);
+  let age = today.getFullYear() - bd.getFullYear();
+  const m = today.getMonth() - bd.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < bd.getDate())) age--;
+  return age;
+}
+
+export default function PublicProfile({ profileId, onBack }) {
+  const [profile, setProfile] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [photoMap, setPhotoMap] = useState({});
-  const [viewingProfileId, setViewingProfileId] = useState(null);
+  const [achvExpanded, setAchvExpanded] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+
+  const [guestCount, setGuestCount] = useState(0);
+  const [organizerCount, setOrganizerCount] = useState(0);
+  const [attendanceRate, setAttendanceRate] = useState(100);
+  const [unlockedIds, setUnlockedIds] = useState(new Set());
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId]);
+  }, [profileId]);
 
   async function load() {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    setMyUserId(session?.user?.id || null);
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', profileId).maybeSingle();
+    setProfile(prof);
+    setPhotoUrl(await getPrimaryPhoto(profileId));
 
-    const { data: ev } = await supabase.from('events').select('*').eq('id', eventId).maybeSingle();
-    setEvent(ev);
+    const { data: meetings } = await supabase.from('completed_meetings').select('*').eq('user_id', profileId);
+    const list = meetings || [];
+    setGuestCount(list.filter((m) => m.role === 'guest').length);
+    setOrganizerCount(list.filter((m) => m.role === 'organizer').length);
 
-    if (ev) {
-      const { data: org } = await supabase.from('profiles').select('*').eq('id', ev.organizer_id).maybeSingle();
-      setOrganizer(org);
+    const { data: attRows } = await supabase
+      .from('event_attendees')
+      .select('attended, guest_confirmed_attended, events!inner(attendance_confirmed)')
+      .eq('user_id', profileId)
+      .eq('events.attendance_confirmed', true);
+    const agreedRows = (attRows || []).filter(
+      (r) => r.guest_confirmed_attended !== null && r.guest_confirmed_attended === r.attended
+    );
+    const rate = agreedRows.length === 0 ? 100 : Math.round((agreedRows.filter((r) => r.attended).length / agreedRows.length) * 100);
+    setAttendanceRate(rate);
 
-      const { data: att } = await supabase
-        .from('event_attendees')
-        .select('user_id, attended, profiles(first_name, last_name)')
-        .eq('event_id', eventId);
-      const attendeesList = att || [];
-      setAttendees(attendeesList);
-
-      const allIds = [ev.organizer_id, ...attendeesList.map((a) => a.user_id)];
-      const { data: photoRows } = await supabase
-        .from('profile_photos')
-        .select('profile_id, photo_url, sort_order')
-        .in('profile_id', allIds)
-        .order('sort_order', { ascending: true });
-      const map = {};
-      (photoRows || []).forEach((p) => {
-        if (!map[p.profile_id]) map[p.profile_id] = p.photo_url;
-      });
-      setPhotoMap(map);
-    }
+    setUnlockedIds(computeAchievements({ meetings: list, attendanceRatePercent: rate, createdAt: prof?.created_at }));
     setLoading(false);
   }
 
-  const isOrganizer = event && myUserId === event.organizer_id;
-  const isJoined = attendees.some((a) => a.user_id === myUserId);
+  if (loading) return <Loading text="Загрузка профиля..." />;
+  if (!profile) return <div className="center-msg">Профиль не найден</div>;
 
-  async function handleJoin() {
-    setBusy(true);
-    await supabase.from('event_attendees').insert({ event_id: eventId, user_id: myUserId });
-    await load();
-    setBusy(false);
+  if (showReport) {
+    return <ReportUser reportedUserId={profile.id} onBack={() => setShowReport(false)} />;
   }
 
-  async function handleLeave() {
-    setBusy(true);
-    await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', myUserId);
-    await load();
-    setBusy(false);
-  }
+  const age = calcAge(profile.birth_date);
+  const ageLabel = profile.show_only_year ? new Date(profile.birth_date).getFullYear() : `${age} ${pluralizeYears(age)}`;
 
-  async function handleRejectGuest(guest) {
-    const name = `${guest.profiles?.first_name || ''} ${guest.profiles?.last_name || ''}`.trim() || 'этого гостя';
-    const sure = window.confirm(`Убрать ${name} со встречи? Встреча пропадёт из его(её) списка.`);
-    if (!sure) return;
-    setBusy(true);
-    // Сообщаем гостю, что его отклонили — до того, как удалить его из встречи
-    await supabase.from('user_notifications').insert({
-      user_id: guest.user_id,
-      event_id: eventId,
-      message: `Организатор отклонил тебя как гостя на встрече «${event.title}». Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
-    });
-    await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', guest.user_id);
-    await load();
-    setBusy(false);
-  }
-
-  async function handleCancelMeeting() {
-    if (attendees.length > 0) {
-      const sure = window.confirm(
-        `На встречу уже откликнулись участники (${attendees.length}). Они автоматически получат уведомление об отмене. Точно хочешь отменить встречу?`
-      );
-      if (!sure) return;
-    } else {
-      const sure = window.confirm('Точно хочешь отменить эту встречу?');
-      if (!sure) return;
-    }
-    setBusy(true);
-    // Сообщаем всем гостям об отмене — обязательно до удаления самой встречи,
-    // иначе проверка доступа не даст записать уведомление
-    for (const a of attendees) {
-      await supabase.from('user_notifications').insert({
-        user_id: a.user_id,
-        event_id: eventId,
-        message: `Встреча «${event.title}», на которую ты записался(-ась), была отменена организатором. Не переживай — отзовись на другие события из списка или карты, или организуй встречу сам(а)!`,
-      });
-    }
-    await supabase.from('events').delete().eq('id', eventId);
-    setBusy(false);
-    onBack();
-  }
-
-  if (viewingProfileId) {
-    return <PublicProfile profileId={viewingProfileId} onBack={() => setViewingProfileId(null)} />;
-  }
-
-  if (loading) return <Loading />;
-  if (!event) return <div className="center-msg">Встреча не найдена</div>;
-
-  const cat = catInfo(event.category);
+  const sortedAchievements = [...ACHIEVEMENTS].sort((a, b) => {
+    const aUnlocked = unlockedIds.has(a.id) ? 0 : 1;
+    const bUnlocked = unlockedIds.has(b.id) ? 0 : 1;
+    return aUnlocked - bUnlocked;
+  });
+  const visibleAchievements = achvExpanded ? sortedAchievements : sortedAchievements.slice(0, 3);
 
   return (
     <div className="screen">
-      <div style={{ padding: '16px 20px' }}>
+      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="backbtn" onClick={onBack}>←</div>
-
-        <h2 style={{ fontSize: 20, marginBottom: 8 }}>{event.title}</h2>
-        <p style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5, marginBottom: 14 }}>{event.description}</p>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          <div>{cat.ic} {cat.label}</div>
-          <div>📍 {event.is_online ? event.online_link : `${event.venue_name}, ${event.address}`}</div>
-          {!event.is_online && event.venue_link && <div>🔗 {event.venue_link}</div>}
-          <div>🕐 {formatEventDate(event.event_date)}, {formatEventTime(event.event_time)}</div>
-          {event.rules && <div>📋 Правила: {event.rules}</div>}
-          {event.age_restriction && <div>🔞 {event.age_restriction}</div>}
+        <div onClick={() => setShowReport(true)} style={{ fontSize: 20, cursor: 'pointer', color: '#ff8b7d' }} title="Пожаловаться на пользователя">
+          ⚠️
         </div>
+      </div>
 
-        {organizer && (
+      <div className="profile-hero" style={{ paddingTop: 0 }}>
+        <Avatar photoUrl={photoUrl} profileId={profile.id} size={64} />
+        <div>
+          <h2 style={{ fontSize: 19 }}>{profile.first_name} {profile.last_name || ''}</h2>
+          {age !== null && <p style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{ageLabel}</p>}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, margin: '0 20px 16px' }}>
+        <div className="stat-box">
+          <div className="n">{guestCount}</div>
+          <div className="l">Как гость</div>
+        </div>
+        <div className="stat-box">
+          <div className="n">{organizerCount}</div>
+          <div className="l">Как организатор</div>
+        </div>
+        <div className="stat-box">
+          <div className="n">{attendanceRate}%</div>
+          <div className="l">Явка</div>
+        </div>
+      </div>
+
+      {profile.about && (
+        <div style={{ margin: '0 20px 16px', padding: 14, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, fontSize: 13, color: 'var(--text-dim)' }}>
+          {profile.about}
+        </div>
+      )}
+
+      <div style={{ margin: '0 20px 16px' }}>
+        <h3 style={{ fontSize: 14, marginBottom: 10 }}>Достижения</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {visibleAchievements.map((a) => {
+            const unlocked = unlockedIds.has(a.id);
+            return (
+              <div key={a.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 12,
+                opacity: unlocked ? 1 : 0.45,
+              }}>
+                <div style={{ fontSize: 20 }}>{a.ic}</div>
+                <div>
+                  <div style={{ fontSize: 13 }}>{a.title}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--text-dim)', marginTop: 2 }}>{a.desc}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {sortedAchievements.length > 3 && (
           <div
-            onClick={() => setViewingProfileId(event.organizer_id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 16, marginBottom: 16, cursor: 'pointer' }}
+            style={{ textAlign: 'center', fontSize: 12, color: 'var(--coral)', marginTop: 10, cursor: 'pointer' }}
+            onClick={() => setAchvExpanded((v) => !v)}
           >
-            <Avatar photoUrl={photoMap[event.organizer_id]} size={44} />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{organizer.first_name} {organizer.last_name || ''}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Организатор встречи</div>
+            {achvExpanded ? 'Свернуть' : `Ещё (${sortedAchievements.length - 3})`}
+          </div>
+        )}
+      </div>
+
+      <div style={{ margin: '0 20px 20px' }}>
+        <div className="settings-row" style={{ borderBottom: 'none' }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500 }}>Темы интересов</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+              {(profile.topics || []).map((t) => catInfo(t).label).join(', ') || 'Не выбраны'}
             </div>
           </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-          <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, padding: 12, textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Unbounded'", fontSize: 18, color: 'var(--coral)' }}>{attendees.length}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>Идут</div>
-          </div>
-          <div style={{ flex: 1, background: 'var(--card)', border: '1px solid var(--stroke)', borderRadius: 14, padding: 12, textAlign: 'center' }}>
-            <div style={{ fontFamily: "'Unbounded'", fontSize: 18, color: 'var(--coral)' }}>{event.participant_limit}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3 }}>Лимит мест</div>
-          </div>
         </div>
-
-        {!isOrganizer && (
-          isJoined ? (
-            <>
-              <button className="btn btn-ghost" style={{ marginBottom: 10 }} onClick={() => onOpenChat(event.title)}>Открыть чат встречи</button>
-              <button className="btn btn-ghost" disabled={busy} onClick={handleLeave}>Покинуть встречу</button>
-            </>
-          ) : (
-            <button className="btn btn-primary" disabled={busy} onClick={handleJoin}>Присоединиться</button>
-          )
-        )}
-
-        {isOrganizer && (
-          <button className="btn btn-ghost" style={{ marginBottom: 10 }} onClick={() => onOpenChat(event.title)}>Открыть чат встречи</button>
-        )}
-
-        {isOrganizer && !isEventPast(event) && (
-          <button
-            className="btn btn-ghost"
-            style={{ color: '#ff8b7d', borderColor: '#5a2b28', marginBottom: 16 }}
-            disabled={busy}
-            onClick={handleCancelMeeting}
-          >
-            Отменить встречу
-          </button>
-        )}
-
-        {isOrganizer && (
-          <div style={{ marginTop: 20 }}>
-            <h3 style={{ fontSize: 15, marginBottom: 10 }}>Гости</h3>
-            {attendees.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 4 }}>Пока никто не присоединился</div>}
-            {attendees.map((a) => (
-              <div key={a.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #22263a' }}>
-                <div
-                  onClick={() => setViewingProfileId(a.user_id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1 }}
-                >
-                  <Avatar photoUrl={photoMap[a.user_id]} size={32} />
-                  <span style={{ fontSize: 13 }}>{a.profiles?.first_name} {a.profiles?.last_name || ''}</span>
-                </div>
-                {event.attendance_confirmed && (
-                  <span style={{ fontSize: 11, marginLeft: 8, color: a.attended ? 'var(--mint)' : 'var(--text-faint)' }}>
-                    {a.attended ? '✓ был(а)' : 'не пришёл(-ла)'}
-                  </span>
-                )}
-                {!isEventPast(event) && (
-                  <button
-                    onClick={() => handleRejectGuest(a)}
-                    disabled={busy}
-                    style={{ marginLeft: 8, background: 'none', border: '1px solid #5a2b28', color: '#ff8b7d', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
-                  >
-                    Отклонить
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
